@@ -1,0 +1,142 @@
+from datetime import datetime, date
+from typing import List, Optional
+from sqlalchemy import String, Integer, ForeignKey, DateTime, Date, Enum, Table, Column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+import enum
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# --- Справочники (Enums) для строгой типизации ---
+class RepairTypeEnum(str, enum.Enum):
+    TO1 = "ТО-1"
+    TO2 = "ТО-2"
+    TO3 = "ТО-3"
+    TR1 = "ТР-1"
+    TR2 = "ТР-2"
+    KR = "КР"
+
+
+class TaskStatusEnum(str, enum.Enum):
+    CREATED = "Создано"
+    IN_PROGRESS = "В работе"
+    COMPLETED = "Завершено"
+
+
+class StageStatusEnum(str, enum.Enum):
+    PENDING = "Ожидание"
+    IN_PROGRESS = "В работе"
+    WAITING_PARTS = "Ожидание запчастей"
+    COMPLETED = "Завершено"
+
+
+# --- Промежуточные таблицы (Ассоциации Многие-ко-Многим) ---
+# Для связи Этап <-> Бригада
+stage_brigade_association = Table(
+    "stage_brigade_association",
+    Base.metadata,
+    Column("stage_id", Integer, ForeignKey("repair_stages.id"), primary_key=True),
+    Column("brigade_id", Integer, ForeignKey("work_brigades.id"), primary_key=True),
+    Column("role", String(100), nullable=True)  # Роль бригады/сотрудника в задаче
+)
+
+# Для связи Этап <-> Запчасти
+stage_part_association = Table(
+    "stage_part_association",
+    Base.metadata,
+    Column("stage_id", Integer, ForeignKey("repair_stages.id"), primary_key=True),
+    Column("part_id", Integer, ForeignKey("parts_and_materials.id"), primary_key=True),
+    Column("quantity_used", Integer, default=1)  # Сколько деталей списано на этап
+)
+
+
+# --- Основные модели ---
+
+class RollingStock(Base):
+    """Сущность МВПС"""
+    __tablename__ = "rolling_stocks"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    inventory_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)  # Инвентарный номер
+    series: Mapped[str] = mapped_column(String(50))  # Серия
+    manufacture_date: Mapped[date] = mapped_column(Date)  # Дата выпуска
+
+    # Связь один-ко-многим: Один вагон имеет много ремонтных заданий
+    repair_tasks: Mapped[List["RepairTask"]] = relationship(back_populates="rolling_stock")
+
+
+class RepairTask(Base):
+    """Ремонтное задание"""
+    __tablename__ = "repair_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    rolling_stock_id: Mapped[int] = mapped_column(ForeignKey("rolling_stocks.id"))
+
+    repair_type: Mapped[RepairTypeEnum] = mapped_column(Enum(RepairTypeEnum))  # Вид ремонта
+    status: Mapped[TaskStatusEnum] = mapped_column(Enum(TaskStatusEnum),
+                                                   default=TaskStatusEnum.CREATED)  # Текущий статус
+
+    start_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)  # В формате UTC
+    planned_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    actual_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    rolling_stock: Mapped["RollingStock"] = relationship(back_populates="repair_tasks")
+    # Задание разбивается на этапы
+    stages: Mapped[List["RepairStage"]] = relationship(back_populates="repair_task", cascade="all, delete-orphan")
+
+
+class Regulation(Base):
+    """Нормативы"""
+    __tablename__ = "regulations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    repair_type: Mapped[RepairTypeEnum] = mapped_column(Enum(RepairTypeEnum), unique=True)
+    standard_hours: Mapped[int] = mapped_column(Integer)  # Норма времени в часах на данный вид ремонта
+
+    stages: Mapped[List["RepairStage"]] = relationship(back_populates="regulation")
+
+
+class RepairStage(Base):
+    """Этап ремонта"""
+    __tablename__ = "repair_stages"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    repair_task_id: Mapped[int] = mapped_column(ForeignKey("repair_tasks.id"))
+    regulation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("regulations.id"), nullable=True)
+
+    name: Mapped[str] = mapped_column(String(100))  # Диагностика, разборка, сборка и т.д.
+    status: Mapped[StageStatusEnum] = mapped_column(Enum(StageStatusEnum),
+                                                    default=StageStatusEnum.PENDING)  # Умный таймер и статусы
+
+    start_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    repair_task: Mapped["RepairTask"] = relationship(back_populates="stages")
+    regulation: Mapped["Regulation"] = relationship(back_populates="stages")
+
+    # M:N связи
+    brigades: Mapped[List["WorkBrigade"]] = relationship(secondary=stage_brigade_association, back_populates="stages")
+    parts: Mapped[List["PartAndMaterial"]] = relationship(secondary=stage_part_association, back_populates="stages")
+
+
+class WorkBrigade(Base):
+    """Рабочая бригада"""
+    __tablename__ = "work_brigades"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+
+    stages: Mapped[List["RepairStage"]] = relationship(secondary=stage_brigade_association, back_populates="brigades")
+
+
+class PartAndMaterial(Base):
+    """Справочник: Запчасти и материалы"""
+    __tablename__ = "parts_and_materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    nomenclature: Mapped[str] = mapped_column(String(150), unique=True)
+    stock_quantity: Mapped[int] = mapped_column(Integer, default=0)  # Проверка наличия на складе
+
+    stages: Mapped[List["RepairStage"]] = relationship(secondary=stage_part_association, back_populates="parts")
