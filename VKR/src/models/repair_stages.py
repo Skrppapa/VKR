@@ -16,16 +16,6 @@ stage_brigade_association = Table(
     Column("role", String(100), nullable=True)  # Роль бригады/сотрудника в задаче
 )
 
-# Для связи Этап - Запчасти
-stage_part_association = Table(
-    "stage_part_association",
-    Base.metadata,
-    Column("stage_id", Integer, ForeignKey("repair_stages.id"), primary_key=True),
-    Column("part_id", Integer, ForeignKey("parts_and_materials.id"), primary_key=True),
-    Column("quantity_used", Integer, default=1)  # Сколько деталей списано на этап
-)
-
-
 class RepairStage(Base):
     """Этап ремонта"""
     __tablename__ = "repair_stages"
@@ -46,4 +36,7 @@ class RepairStage(Base):
 
     # M:N связи
     brigades: Mapped[list["WorkBrigade"]] = relationship(secondary=stage_brigade_association, back_populates="stages")
-    parts: Mapped[list["PartAndMaterial"]] = relationship(secondary=stage_part_association, back_populates="stages")
+    part_associations: Mapped[list["StagePart"]] = relationship(
+        back_populates="stage",
+        cascade="all, delete-orphan"  # Важно: если удалим этап, связь тоже удалится
+    )

@@ -10,6 +10,8 @@ from src.models.repair_stages import RepairStage
 from src.models.repair_tasks import RepairTask
 from src.models.rolling_stocks import RollingStock
 from src.models.work_brigades import WorkBrigade
+from src.models.stage_parts import StagePart
+import time
 
 
 async def run_simulation():
@@ -22,30 +24,51 @@ async def run_simulation():
         # ==========================================
         print("1. Подготовка справочников (Бригады, Запчасти, Нормативы)...")
 
-        brigade_alpha = WorkBrigade(name="Бригада Слесарей №1")
-        part_wheel = PartAndMaterial(nomenclature="Колесная пара ТИП-А", stock_quantity=10)
-        part_oil = PartAndMaterial(nomenclature="Масло трансмиссионное (бочка)", stock_quantity=5)
+        # Функция-помощник для поиска или создания
+        async def get_or_create_part(name: str, qty: int):
+            query = select(PartAndMaterial).where(PartAndMaterial.nomenclature == name)
+            part = (await session.execute(query)).scalar_one_or_none()
+            if not part:
+                part = PartAndMaterial(nomenclature=name, stock_quantity=qty)
+                session.add(part)
+            return part
 
-        # Создаем норматив для ремонта ТО-3
-        reg_to3 = Regulation(repair_type=RepairTypeEnum.TO3, standard_hours=24)  # [cite: 7]
+        part_wheel = await get_or_create_part("Колесная пара ТИП-А", 10)
+        part_oil = await get_or_create_part("Масло трансмиссионное (бочка)", 5)
 
-        session.add_all([brigade_alpha, part_wheel, part_oil, reg_to3])
+        # То же самое для бригады
+        query_brigade = select(WorkBrigade).where(WorkBrigade.name == "Бригада Слесарей №1")
+        brigade_alpha = (await session.execute(query_brigade)).scalar_one_or_none()
+        if not brigade_alpha:
+            brigade_alpha = WorkBrigade(name="Бригада Слесарей №1")
+            session.add(brigade_alpha)
+
+        # То же самое для норматива
+        query_reg = select(Regulation).where(Regulation.repair_type == RepairTypeEnum.TO3)
+        reg_to3 = (await session.execute(query_reg)).scalar_one_or_none()
+        if not reg_to3:
+            reg_to3 = Regulation(repair_type=RepairTypeEnum.TO3, standard_hours=24)
+            session.add(reg_to3)
+
         await session.commit()
-        print("✅ Справочники загружены.\n")
+        print("✅ Справочники загружены (или найдены существующие).\n")
 
         # ==========================================
         # БЛОК 2: Создание МВПС и Ремонтного задания
         # ==========================================
         print("2. Приемка поезда и постановка задачи...")
 
-        # Создаем вагон
+        unique_id = int(time.time())  # Генерируем уникальный хвост
+        train_number = f"МВПС-1024-{unique_id}"
+
+        # Создаем вагон с уникальным инвентарным номером
         train = RollingStock(
-            inventory_number="МВПС-1024-А",
+            inventory_number=train_number,
             series="ЭД4М",
-            manufacture_date=date(2015, 5, 10)  # [cite: 9]
+            manufacture_date=date(2015, 5, 10)
         )
         session.add(train)
-        await session.flush()  # flush отправляет данные в БД, чтобы получить train.id, но транзакция еще открыта
+        await session.flush()
 
         # Создаем ремонтное задание для этого вагона
         task = RepairTask(
@@ -73,8 +96,13 @@ async def run_simulation():
 
         # Магия ORM: Добавляем связи M:N через списки (Алхимия сама заполнит ассоциативные таблицы)
         stage_diag.brigades.append(brigade_alpha)
-        stage_diag.parts.append(part_wheel)
-        stage_diag.parts.append(part_oil)
+
+        # Добавляем 2 колесные пары
+        sp_wheel = StagePart(part=part_wheel, quantity_used=2)
+        # Добавляем 5 литров масла
+        sp_oil = StagePart(part=part_oil, quantity_used=5)
+
+        stage_diag.part_associations.extend([sp_wheel, sp_oil])
 
         session.add(stage_diag)
         await session.commit()
@@ -103,8 +131,8 @@ async def run_simulation():
         # Строим сложный запрос: Достаем вагон со всеми его заданиями, этапами, бригадами и запчастями!
         stmt = (
             select(RollingStock)
-            .where(RollingStock.inventory_number == "МВПС-1024-А")
-            # Используем selectinload для подгрузки связанных коллекций без проблемы "n+1 запросов"
+            # ИСПРАВЛЕНИЕ 1: Ищем именно тот вагон, который только что создали!
+            .where(RollingStock.inventory_number == train_number)
             .options(
                 selectinload(RollingStock.repair_tasks)
                 .selectinload(RepairTask.stages)
@@ -113,7 +141,10 @@ async def run_simulation():
             .options(
                 selectinload(RollingStock.repair_tasks)
                 .selectinload(RepairTask.stages)
-                .selectinload(RepairStage.parts)
+                # ИСПРАВЛЕНИЕ 2: Обращаемся к новому имени связи
+                .selectinload(RepairStage.part_associations)
+                # ИСПРАВЛЕНИЕ 3: Подтягиваем саму деталь (PartAndMaterial) из промежуточной модели
+                .selectinload(StagePart.part)
             )
         )
 
@@ -129,9 +160,12 @@ async def run_simulation():
                     print(f"    Этап: {s.name} ({s.status.value})")
                     brigades_str = ", ".join([b.name for b in s.brigades])
                     print(f"      Бригады: {brigades_str}")
-                    parts_str = ", ".join([p.nomenclature for p in s.parts])
+                    # Здесь у тебя всё было написано правильно!
+                    parts_str = ", ".join(
+                        [f"{pa.part.nomenclature} ({pa.quantity_used} шт.)" for pa in s.part_associations])
                     print(f"      Детали: {parts_str}")
         print("-----------------------\n")
+
 
 
 if __name__ == "__main__":
