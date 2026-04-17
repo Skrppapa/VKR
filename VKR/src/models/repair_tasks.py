@@ -1,4 +1,4 @@
-from src.database import Base
+from src.database import Base, int_pk
 from src.models.enums import RepairTypeEnum, TaskStatusEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import DateTime, ForeignKey, Enum
@@ -11,7 +11,7 @@ class RepairTask(Base):
     """Ремонтное задание"""
     __tablename__ = "repair_tasks"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int_pk]
     rolling_stock_id: Mapped[int] = mapped_column(ForeignKey("rolling_stocks.id"))
 
     repair_type: Mapped[RepairTypeEnum] = mapped_column(Enum(RepairTypeEnum))  # Вид ремонта
@@ -19,8 +19,8 @@ class RepairTask(Base):
                                                    default=TaskStatusEnum.CREATED)  # Текущий статус
 
     start_date: Mapped[datetime] = mapped_column(DateTime, default=func.now())
-    planned_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    actual_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    planned_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     rolling_stock: Mapped["RollingStock"] = relationship(back_populates="repair_tasks")
     # Задание разбивается на этапы

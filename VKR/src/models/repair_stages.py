@@ -1,4 +1,4 @@
-from src.database import Base
+from src.database import Base, int_pk
 from src.models.enums import StageStatusEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import DateTime, ForeignKey, Enum, String, Table, Column, Integer
@@ -30,7 +30,7 @@ class RepairStage(Base):
     """Этап ремонта"""
     __tablename__ = "repair_stages"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int_pk]
     repair_task_id: Mapped[int] = mapped_column(ForeignKey("repair_tasks.id"))
     regulation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("regulations.id"), nullable=True)
 
@@ -38,8 +38,8 @@ class RepairStage(Base):
     status: Mapped[StageStatusEnum] = mapped_column(Enum(StageStatusEnum),
                                                     default=StageStatusEnum.PENDING)  # Умный таймер и статусы
 
-    start_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    start_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     repair_task: Mapped["RepairTask"] = relationship(back_populates="stages")
     regulation: Mapped["Regulation"] = relationship(back_populates="stages")

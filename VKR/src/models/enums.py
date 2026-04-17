@@ -9,7 +9,9 @@ class RepairTypeEnum(str, enum.Enum):
     TO3 = "ТО-3"
     TR1 = "ТР-1"
     TR2 = "ТР-2"
-    KR = "КР"
+    TR3 = "ТР-3"
+    KR1 = "КР-1"
+    KR2 = "КР-2"
 
 
 class TaskStatusEnum(str, enum.Enum):
