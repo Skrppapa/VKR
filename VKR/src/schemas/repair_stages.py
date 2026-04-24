@@ -34,10 +34,16 @@ class RepairStageCreate(RepairStageBase):
     regulation_id: Optional[int] = None
 
 
+class StageStatusPatch(BaseModel):
+    status: StageStatusEnum
+
+
 class RepairStageUpdate(BaseModel):
+    name: Optional[str] = None
     status: Optional[StageStatusEnum] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+    regulation_id: Optional[int] = None
 
 
 # Схема ответа (Чтение этапа)
@@ -51,3 +57,5 @@ class RepairStageResponse(RepairStageBase):
     # ВАЖНО: Мы не тянем сюда все детали по умолчанию,
     # чтобы не перегружать обычные списочные запросы.
     model_config = ConfigDict(from_attributes=True)
+
+

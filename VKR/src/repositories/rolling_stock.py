@@ -5,7 +5,7 @@ from typing import Optional
 
 from src.repositories.base import BaseRepository
 from src.models.rolling_stocks import RollingStock
-from src.schemas.rolling_stocks import RollingStockCreate, RollingStockUpdate  # Нету схемы для Update
+from src.schemas.rolling_stocks import RollingStockCreate, RollingStockUpdate
 
 class RollingStockRepository(BaseRepository[RollingStock, RollingStockCreate, RollingStockUpdate]):
     def __init__(self, session: AsyncSession):

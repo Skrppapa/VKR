@@ -11,6 +11,9 @@ class RepairTaskCreate(RepairTaskBase):
     rolling_stock_id: int
     # Статус CREATED и start_date база/модель поставят сами
 
+class TaskStatusPatch(BaseModel):
+    status: TaskStatusEnum
+
 class RepairTaskUpdate(BaseModel):
     status: Optional[TaskStatusEnum] = None
     planned_end_date: Optional[datetime] = None
