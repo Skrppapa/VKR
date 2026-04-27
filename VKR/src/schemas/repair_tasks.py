@@ -9,17 +9,12 @@ class RepairTaskBase(BaseModel):
 
 class RepairTaskCreate(RepairTaskBase):
     rolling_stock_id: int
-    # Статус CREATED и start_date база/модель поставят сами
+    # Статус CREATED и start_date база поставит сама
 
 class TaskStatusPatch(BaseModel):
     status: TaskStatusEnum
 
-class RepairTaskUpdate(BaseModel):
-    status: Optional[TaskStatusEnum] = None
-    planned_end_date: Optional[datetime] = None
-    actual_end_date: Optional[datetime] = None
 
-# Обычный ответ (например, для списка всех заданий)
 class RepairTaskResponse(RepairTaskBase):
     id: int
     rolling_stock_id: int
@@ -30,6 +25,13 @@ class RepairTaskResponse(RepairTaskBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # Расширенный ответ (например, когда запрашивают конкретное задание по ID)
 class RepairTaskWithStagesResponse(RepairTaskResponse):
     stages: List[RepairStageResponse] = [] # Подтянет вложенные этапы
+
+
+# class RepairTaskUpdate(BaseModel):
+#     status: Optional[TaskStatusEnum] = None
+#     planned_end_date: Optional[datetime] = None
+#     actual_end_date: Optional[datetime] = None

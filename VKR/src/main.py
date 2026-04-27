@@ -2,8 +2,7 @@ import sys
 import uvicorn
 from fastapi import FastAPI
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent))  # Дает понять интерпретатору где он находится, родительскую папку - src и род. папку самой src - FastAPI_Course
-import src.models
+sys.path.append(str(Path(__file__).parent.parent))
 
 from src.api.routers.rolling_stock import router as rolling_stock_router
 from src.api.routers.catalogs import router as catalogs_router

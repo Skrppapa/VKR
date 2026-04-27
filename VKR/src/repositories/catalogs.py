@@ -1,5 +1,4 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.repositories.base import BaseRepository
 from src.models.parts_and_materials import PartAndMaterial
 from src.models.regulations import Regulation

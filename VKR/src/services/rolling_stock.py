@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from src.repositories.rolling_stock import RollingStockRepository
-from src.schemas.rolling_stocks import RollingStockCreate, RollingStockUpdate, RollingStockResponse
+from src.schemas.rolling_stocks import RollingStockCreate, RollingStockUpdate
 from src.models.rolling_stocks import RollingStock
 
 

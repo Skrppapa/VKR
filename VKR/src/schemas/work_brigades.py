@@ -11,7 +11,6 @@ class WorkBrigadeCreate(WorkBrigadeBase):
 
 
 class WorkBrigadeUpdate(BaseModel):
-    # При обновлении поле может быть опущено (None), но если передано — валидируется
     name: Optional[str] = Field(None, min_length=2, max_length=100)
 
 

@@ -7,10 +7,11 @@ class RollingStockBase(BaseModel):
     series: str = Field(..., max_length=50, description="Серийный № поезда")
     manufacture_date: date
 
-class RollingStockCreate(RollingStockBase):
-    pass # Те же поля что и в БД
 
-# --- ДОБАВЛЕНА СХЕМА ОБНОВЛЕНИЯ ---
+class RollingStockCreate(RollingStockBase):
+    pass
+
+
 class RollingStockUpdate(BaseModel):
     inventory_number: Optional[str] = Field(None, max_length=50, description="Инвентарный № поезда")
     series: Optional[str] = Field(None, max_length=50, description="Серийный № поезда")

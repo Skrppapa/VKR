@@ -4,7 +4,7 @@ from typing import List
 from src.api.dependencies import get_db_session
 from src.services.repair_tasks import RepairTaskService
 from src.schemas.repair_tasks import RepairTaskCreate, RepairTaskResponse, RepairTaskWithStagesResponse
-from src.schemas.repair_tasks import TaskStatusPatch, RepairTaskUpdate
+from src.schemas.repair_tasks import TaskStatusPatch
 
 router = APIRouter(prefix="/repair-tasks", tags=["Ремонтные задания"])
 
@@ -35,7 +35,7 @@ async def update_task_status(
     return await service.update_task_status(task_id, status_data)
 
 @router.patch("/{task_id}", response_model=RepairTaskResponse)
-async def update_task(task_id: int, data: RepairTaskUpdate, session: AsyncSession = Depends(get_db_session)):
+async def update_task(task_id: int, data: TaskStatusPatch, session: AsyncSession = Depends(get_db_session)):
     return await RepairTaskService(session).update_task(task_id, data)
 
 @router.delete("/{task_id}", status_code=204)

@@ -6,7 +6,6 @@ from typing import Optional
 import datetime
 
 
-# Промежуточные таблицы
 # Для связи Этап - Бригада
 stage_brigade_association = Table(
     "stage_brigade_association",
@@ -23,11 +22,8 @@ class RepairStage(Base):
     id: Mapped[int_pk]
     repair_task_id: Mapped[int] = mapped_column(ForeignKey("repair_tasks.id"))
     regulation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("regulations.id"), nullable=True)
-
     name: Mapped[str] = mapped_column(String(100))  # Диагностика, разборка, сборка и т.д.
-    status: Mapped[StageStatusEnum] = mapped_column(Enum(StageStatusEnum),
-                                                    default=StageStatusEnum.PENDING)  # Умный таймер и статусы
-
+    status: Mapped[StageStatusEnum] = mapped_column(Enum(StageStatusEnum), default=StageStatusEnum.PENDING)  # Умный таймер и статусы
     start_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -38,5 +34,5 @@ class RepairStage(Base):
     brigades: Mapped[list["WorkBrigade"]] = relationship(secondary=stage_brigade_association, back_populates="stages")
     part_associations: Mapped[list["StagePart"]] = relationship(
         back_populates="stage",
-        cascade="all, delete-orphan"  # Важно: если удалим этап, связь тоже удалится
+        cascade="all, delete-orphan"  # Если удалим этап, связь тоже удалится
     )

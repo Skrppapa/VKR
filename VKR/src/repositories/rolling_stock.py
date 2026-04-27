@@ -11,14 +11,13 @@ class RollingStockRepository(BaseRepository[RollingStock, RollingStockCreate, Ro
     def __init__(self, session: AsyncSession):
         super().__init__(RollingStock, session)
 
-    # Кастомный метод, которого нет в BaseRepository
     async def get_by_inventory_number(self, inv_number: str) -> Optional[RollingStock]:
         query = select(self.model).where(self.model.inventory_number == inv_number)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def get_with_tasks(self, obj_id: int) -> Optional[RollingStock]:
-        """Достать МВПС сразу с его ремонтными заданиями (без проблемы N+1)"""
+        """Достать МВПС сразу с его ремонтными заданиями"""
         query = (
             select(self.model)
             .where(self.model.id == obj_id)

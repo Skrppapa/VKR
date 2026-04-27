@@ -1,8 +1,8 @@
 from typing import Generic, TypeVar, Type, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert, update, delete
+from sqlalchemy import select, delete
 from pydantic import BaseModel
-from src.database import Base  # Твой базовый класс Алхимии
+from src.database import Base
 
 # TypeVars для аннотаций: Модель Алхимии, Схема создания, Схема обновления
 ModelType = TypeVar("ModelType", bound=Base)
@@ -29,13 +29,11 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def create(self, obj_in: CreateSchemaType | dict[str, Any]) -> ModelType:
         """Создать новую запись."""
-        # Если пришла Pydantic схема, превращаем её в словарь
-        obj_in_data = obj_in.model_dump() if isinstance(obj_in, BaseModel) else obj_in
+        obj_in_data = obj_in.model_dump() if isinstance(obj_in, BaseModel) else obj_in # Если пришла Pydantic схема, превращаем её в словарь
 
         db_obj = self.model(**obj_in_data)
         self.session.add(db_obj)
-        # Мы делаем flush, а не commit! Коммит должен делать Сервисный слой (Unit of Work)
-        await self.session.flush()
+        await self.session.flush() # Делаем flush, а не commit. Коммит делает сервисный слой
         return db_obj
 
     async def update(self, db_obj: ModelType, obj_in: UpdateSchemaType | dict[str, Any]) -> ModelType:

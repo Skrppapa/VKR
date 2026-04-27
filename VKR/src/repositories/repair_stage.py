@@ -2,7 +2,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import Optional
-
 from src.repositories.base import BaseRepository
 from src.models.repair_stages import RepairStage
 from src.models.stage_parts import StagePart

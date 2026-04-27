@@ -1,11 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from src.repositories.repair_tasks import RepairTaskRepository
-from src.schemas.repair_tasks import RepairTaskCreate
-from src.models.repair_tasks import RepairTask
 from datetime import datetime, timezone
+from src.repositories.repair_tasks import RepairTaskRepository
+from src.schemas.repair_tasks import RepairTaskCreate, TaskStatusPatch
+from src.models.repair_tasks import RepairTask
 from src.models.enums import TaskStatusEnum, StageStatusEnum
-from src.schemas.repair_tasks import TaskStatusPatch, RepairTaskUpdate
 
 class RepairTaskService:
     def __init__(self, session: AsyncSession):
@@ -58,13 +57,25 @@ class RepairTaskService:
 
         return task
 
-    async def update_task(self, task_id: int, update_data: RepairTaskUpdate):
-        task = await self.repo.get_by_id(task_id)
-        if not task: raise HTTPException(404, "Задание не найдено")
-        updated_task = await self.repo.update(task, update_data)
-        await self.session.commit()
-        return updated_task
+    # async def update_task(self, task_id: int, update_data: RepairTaskUpdate):
+    #     task = await self.repo.get_by_id(task_id)
+    #     if not task: raise HTTPException(404, "Задание не найдено")
+    #     updated_task = await self.repo.update(task, update_data)
+    #     await self.session.commit()
+    #     return updated_task
 
     async def delete_task(self, task_id: int):
+        task = await self.repo.get_by_id(task_id)
+        if not task:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Задание не найдено")
+
+        # ЗАЩИТА ОТ УДАЛЕНИЯ АКТИВНЫХ И ЗАВЕРШЕННЫХ ЗАДАНИЙ
+        if task.status in [TaskStatusEnum.IN_PROGRESS, TaskStatusEnum.COMPLETED]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя удалить задание, которое уже выполняется или завершено."
+            )
+
         await self.repo.delete(task_id)
         await self.session.commit()
+

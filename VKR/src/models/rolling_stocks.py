@@ -5,12 +5,12 @@ from datetime import date
 
 
 class RollingStock(Base):
-    """Сущность МВПС"""
+    """Подвижной состав (МВПС)"""
     __tablename__ = "rolling_stocks"
 
     id: Mapped[int_pk]
     inventory_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)  # Инвентарный номер
-    series: Mapped[str] = mapped_column(String(50))  # Серийный номер
+    series: Mapped[str] = mapped_column(String(50))  # Модель
     manufacture_date: Mapped[date] = mapped_column(Date)  # Дата выпуска
 
     # Связь один-ко-многим: Один вагон имеет много ремонтных заданий
