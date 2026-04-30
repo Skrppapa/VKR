@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from src.models.enums import StageStatusEnum
 
-# Микро-схема для детали
+# Схема для детали
 class PartShortResponse(BaseModel):
     id: int
     nomenclature: str
@@ -31,6 +31,8 @@ class RepairStageCreate(RepairStageBase):
 
 class StageStatusPatch(BaseModel):
     status: StageStatusEnum
+    pause_reason: Optional[str] = Field(None, max_length=500,
+                                        description="Причина паузы. Обязательна, если статус PAUSED")
 
 
 class RepairStageUpdate(BaseModel):
@@ -46,7 +48,14 @@ class RepairStageResponse(RepairStageBase):
     regulation_id: Optional[int]
     start_time: Optional[datetime]
     end_time: Optional[datetime]
+    last_paused_at: Optional[datetime] = None
+    total_paused_seconds: int = 0
+    pause_reason: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+
+
 
 

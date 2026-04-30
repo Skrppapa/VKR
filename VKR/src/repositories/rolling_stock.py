@@ -2,7 +2,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import Optional
-
 from src.repositories.base import BaseRepository
 from src.models.rolling_stocks import RollingStock
 from src.schemas.rolling_stocks import RollingStockCreate, RollingStockUpdate
@@ -12,6 +11,7 @@ class RollingStockRepository(BaseRepository[RollingStock, RollingStockCreate, Ro
         super().__init__(RollingStock, session)
 
     async def get_by_inventory_number(self, inv_number: str) -> Optional[RollingStock]:
+        """Достать МВПС по инвентарному номеру"""
         query = select(self.model).where(self.model.inventory_number == inv_number)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
@@ -25,3 +25,9 @@ class RollingStockRepository(BaseRepository[RollingStock, RollingStockCreate, Ro
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def check_series_exists(self, series: str) -> bool:
+        """Проверяет, заведен ли хоть один поезд указанной серии"""
+        query = select(self.model).where(self.model.series == series).limit(1)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() is not None

@@ -1,13 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-from datetime import datetime, timezone
-from src.models import RepairTask, Regulation
-from src.repositories.repair_stage import RepairStageRepository
-from src.repositories.catalogs import PartRepository
-from src.schemas.repair_stages import RepairStageCreate, StageStatusPatch, RepairStageUpdate
+from datetime import datetime, timezone, timedelta
 from src.models.repair_stages import RepairStage
 from src.models.stage_parts import StagePart
-from src.models.enums import StageStatusEnum
+from src.models.enums import StageStatusEnum, TaskStatusEnum
+from src.schemas.repair_stages import StageStatusPatch
+from src.repositories.repair_stage import RepairStageRepository
+from src.repositories.catalogs import PartRepository, RegulationRepository
+from src.repositories.repair_tasks import RepairTaskRepository
 
 
 class RepairStageService:
@@ -15,101 +15,126 @@ class RepairStageService:
         self.session = session
         self.stage_repo = RepairStageRepository(session)
         self.part_repo = PartRepository(session)
-
-    async def create_stage(self, stage_in: RepairStageCreate):
-        # 1. Достаем родительское задание
-        task = await self.session.get(RepairTask, stage_in.repair_task_id)
-        if not task:
-            raise HTTPException(status_code=404, detail="Родительское задание не найдено")
-
-        # 2. Проверяем норматив (если он передан)
-        if stage_in.regulation_id:
-            reg = await self.session.get(Regulation, stage_in.regulation_id)
-            if not reg:
-                raise HTTPException(status_code=404, detail="Указанный норматив не найден")
-
-            # СВЕРКА: Тип ремонта у задачи и у норматива должны совпадать!
-            if reg.repair_type != task.repair_type:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Конфликт! Задание требует {task.repair_type.value}, а этап ссылается на норматив для {reg.repair_type.value}"
-                )
-
-        # 3. Если проверки пройдены, создаем этап
-        stage = await self.stage_repo.create(stage_in)
-        await self.session.commit()
-        return stage
-
-
+        self.task_repo = RepairTaskRepository(session)
+        self.reg_repo = RegulationRepository(session)
 
     async def assign_part_to_stage(self, stage_id: int, part_id: int, quantity: int):
         """Списание детали со склада и привязка к этапу."""
 
-        # 1. Проверяем наличие этапа
-        stage = await self.stage_repo.get_by_id(stage_id)
-        if not stage:
-            raise HTTPException(status_code=404, detail="Этап не найден")
-
-        # 2. Проверяем наличие детали на складе
-        part = await self.part_repo.get_by_id(part_id)
-        if not part:
-            raise HTTPException(status_code=404, detail="Деталь не найдена в базе")
-
-        if part.stock_quantity < quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Недостаточно деталей на складе. Доступно: {part.stock_quantity}, запрошено: {quantity}"
-            )
-
-        # 3. Списываем со склада (обновляем остаток)
-        part.stock_quantity -= quantity
-        self.session.add(part)  # Сохраняем изменение детали
-
-        # 4. Создаем связь StagePart
-        stage_part = StagePart(stage_id=stage_id, part_id=part_id, quantity_used=quantity)
-        self.session.add(stage_part)
-
-        # 5. Фиксируем транзакцию (списание и привязка происходят ОДНОВРЕМЕННО)
-        await self.session.commit()
-        return {"message": "Детали успешно списаны и привязаны к этапу"}
-
-    async def update_stage_status(self, stage_id: int, status_data: StageStatusPatch) -> RepairStage:
-        """Смена статуса этапа с автоматической фиксацией времени."""
         stage = await self.stage_repo.get_by_id(stage_id)
         if not stage:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
 
-        new_status = status_data.status
+        part = await self.part_repo.get_by_id(part_id)
+        if not part:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Деталь не найдена в базе")
 
-        # Логика 1: Переход "В работу"
-        if new_status == StageStatusEnum.IN_PROGRESS and stage.status != StageStatusEnum.IN_PROGRESS:
-            stage.start_time = datetime.now(timezone.utc)
+        if part.stock_quantity < quantity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Недостаточно деталей на складе. Доступно: {part.stock_quantity}, запрошено: {quantity}"
+            )
 
-        # Логика 2: Переход "Завершено"
-        elif new_status == StageStatusEnum.COMPLETED and stage.status != StageStatusEnum.COMPLETED:
-            stage.end_time = datetime.now(timezone.utc)
-            # Если завершили без начала (например, быстрая отметка), ставим старт тем же временем
-            if not stage.start_time:
-                stage.start_time = stage.end_time
+        part.stock_quantity -= quantity
+        self.session.add(part)
 
-        # Обновляем статус
-        stage.status = new_status
+        stage_part = StagePart(stage_id=stage_id, part_id=part_id, quantity_used=quantity)
+        self.session.add(stage_part)
 
-        # Передаем обновленный объект в репозиторий (он сам сделает session.add)
-        await self.stage_repo.update(stage,
-                                     {"status": new_status, "start_time": stage.start_time, "end_time": stage.end_time})
-
-        # Коммитим транзакцию
         await self.session.commit()
-        return stage
+        return {"message": "Детали успешно списаны и привязаны к этапу"}
 
-    async def update_stage(self, stage_id: int, update_data: RepairStageUpdate):
+    async def update_stage_status(self, stage_id: int, status_data: StageStatusPatch) -> RepairStage:
+        """Обновление статуса этапа"""
+
         stage = await self.stage_repo.get_by_id(stage_id)
-        if not stage: raise HTTPException(404, "Этап не найден")
-        updated_stage = await self.stage_repo.update(stage, update_data)
-        await self.session.commit()
-        return updated_stage
+        if not stage:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
 
-    async def delete_stage(self, stage_id: int):
-        await self.stage_repo.delete(stage_id)
+        task = await self.task_repo.get_with_stages(stage.repair_task_id)
+        if not task:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Родительское задание не найдено")
+
+        task_stages = sorted(task.stages, key=lambda s: s.id)
+        current_index = next(i for i, s in enumerate(task_stages) if s.id == stage.id)
+
+        new_status = status_data.status
+        old_status = stage.status
+
+        if new_status == old_status:
+            return stage
+
+        # Ожидание запчастей или пауза
+        if new_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS]:
+            if new_status == StageStatusEnum.PAUSED and not status_data.pause_reason:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="При ручном переходе в паузу необходимо указать причину (pause_reason)."
+                )
+
+            stage.pause_reason = status_data.pause_reason
+            stage.last_paused_at = datetime.now(timezone.utc)
+
+            if new_status == StageStatusEnum.WAITING_PARTS:
+                task.status = TaskStatusEnum.WAITING_PARTS
+            else:
+                task.status = TaskStatusEnum.PAUSED
+
+        # Запуск этапа В работу
+        elif new_status == StageStatusEnum.IN_PROGRESS:
+            if current_index > 0:
+                prev_stage = task_stages[current_index - 1]
+                if prev_stage.status != StageStatusEnum.COMPLETED:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Нельзя начать этот этап. Предыдущий этап '{prev_stage.name}' не завершен."
+                    )
+
+            # Сценарий 1: Снятие с паузы
+            if old_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS] and stage.last_paused_at:
+                pause_duration = datetime.now(timezone.utc) - stage.last_paused_at
+                seconds = int(pause_duration.total_seconds())
+
+                stage.total_paused_seconds += seconds
+                task.total_paused_seconds += seconds
+
+                if task.planned_end_date:
+                    task.planned_end_date += pause_duration
+
+                stage.last_paused_at = None
+                task.status = TaskStatusEnum.IN_PROGRESS
+
+            # Сценарий 2: Первый старт этапа
+            if not stage.start_time:
+                stage.start_time = datetime.now(timezone.utc)
+
+            # Если это самый первый этап всей задачи - стартуем Задание
+            if current_index == 0 and not task.start_date:
+                task.start_date = datetime.now(timezone.utc)
+                task.status = TaskStatusEnum.IN_PROGRESS
+
+                # Получаем норматив через репозиторий
+                if stage.regulation_id:
+                    reg = await self.reg_repo.get_by_id(stage.regulation_id)
+                    if reg:
+                        task.planned_end_date = task.start_date + timedelta(hours=reg.standard_hours)
+            else:
+                task.status = TaskStatusEnum.IN_PROGRESS
+
+        # Завершение этапа
+        elif new_status == StageStatusEnum.COMPLETED:
+            if not stage.start_time:
+                stage.start_time = datetime.now(timezone.utc)
+            stage.end_time = datetime.now(timezone.utc)
+
+            is_last_stage = (current_index == len(task_stages) - 1)
+            if is_last_stage:
+                task.status = TaskStatusEnum.COMPLETED
+                task.actual_end_date = datetime.now(timezone.utc)
+
+        stage.status = new_status
+        self.session.add(stage)
+        self.session.add(task)
         await self.session.commit()
+
+        return stage

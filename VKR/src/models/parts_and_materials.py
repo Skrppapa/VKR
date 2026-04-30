@@ -9,6 +9,6 @@ class PartAndMaterial(Base):
 
     id: Mapped[int_pk]
     nomenclature: Mapped[str] = mapped_column(String(150), unique=True)
-    stock_quantity: Mapped[int] = mapped_column(Integer, default=0)  # Количество на складе
+    stock_quantity: Mapped[int] = mapped_column(Integer, default=0)
 
     stage_associations: Mapped[list["StagePart"]] = relationship(back_populates="part")

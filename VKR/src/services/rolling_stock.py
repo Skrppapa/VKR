@@ -11,7 +11,7 @@ class RollingStockService:
         self.repo = RollingStockRepository(session)
 
     async def create_train(self, train_in: RollingStockCreate) -> RollingStock:
-        # 1. Проверяем бизнес-правило: нет ли уже поезда с таким номером?
+        # Проверка на дубликаты
         existing_train = await self.repo.get_by_inventory_number(train_in.inventory_number)
         if existing_train:
             raise HTTPException(
@@ -19,10 +19,9 @@ class RollingStockService:
                 detail=f"Поезд с номером {train_in.inventory_number} уже существует."
             )
 
-        # 2. Создаем через репозиторий
+        # Создание
         new_train = await self.repo.create(train_in)
 
-        # 3. Фиксируем изменения в БД
         await self.session.commit()
         return new_train
 
@@ -43,8 +42,6 @@ class RollingStockService:
         train = await self.repo.get_by_id(train_id)
         if not train:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="МВПС не найден")
-
-        # Репозиторий сам обновит только те поля, которые были переданы в JSON
         updated_train = await self.repo.update(train, update_data)
         await self.session.commit()
         return updated_train
@@ -54,6 +51,5 @@ class RollingStockService:
         train = await self.repo.get_by_id(train_id)
         if not train:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="МВПС не найден")
-
         await self.repo.delete(train_id)
         await self.session.commit()

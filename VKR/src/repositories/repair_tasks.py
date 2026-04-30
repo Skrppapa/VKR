@@ -14,13 +14,13 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         super().__init__(RepairTask, session)
 
     async def get_active_tasks(self) -> List[RepairTask]:
-        """Получить все незавершенные задания."""
+        """Получить все активные задания"""
         query = select(self.model).where(self.model.status != TaskStatusEnum.COMPLETED)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def get_full_task_graph(self, task_id: int) -> Optional[RepairTask]:
-        """Достать задание со всеми этапами, бригадами и деталями."""
+        """Достать задание со всеми этапами, бригадами и деталями"""
         query = (
             select(self.model)
             .where(self.model.id == task_id)
@@ -31,3 +31,21 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_with_stages(self, task_id: int) -> Optional[RepairTask]:
+        """Достать задание только с его этапами - для статусов"""
+        query = (
+            select(self.model)
+            .where(self.model.id == task_id)
+            .options(selectinload(self.model.stages))
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_archived_tasks(self, skip: int = 0, limit: int = 100) -> List[RepairTask]:
+        """Получить завершенные задания (Архив)"""
+        query = select(self.model).where(
+            self.model.status == TaskStatusEnum.COMPLETED
+        ).offset(skip).limit(limit)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())

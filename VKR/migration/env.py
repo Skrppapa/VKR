@@ -20,6 +20,7 @@ from src.models.repair_stages import RepairStage
 from src.models.rolling_stocks import RollingStock
 from src.models.work_brigades import WorkBrigade
 from src.models.stage_parts import StagePart
+from src.models.regulation_stage_template import RegulationStageTemplate
 from alembic import context
 
 # this is the Alembic Config object, which provides

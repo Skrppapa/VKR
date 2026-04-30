@@ -6,9 +6,9 @@ from src.models.repair_stages import RepairStage
 from src.models.work_brigades import WorkBrigade
 from src.models.parts_and_materials import PartAndMaterial
 from src.models.stage_parts import StagePart
+from src.models.regulation_stage_template import RegulationStageTemplate
 from src.models.regulations import Regulation
 
-# __all__ подсказывает, что именно мы экспортируем из папки models
 __all__ = [
     "Base",
     "RollingStock",
@@ -17,6 +17,7 @@ __all__ = [
     "WorkBrigade",
     "PartAndMaterial",
     "StagePart",
+    "RegulationStageTemplate",
     "Regulation",
     "RepairTypeEnum",
     "TaskStatusEnum",

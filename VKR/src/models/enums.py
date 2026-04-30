@@ -12,15 +12,17 @@ class RepairTypeEnum(str, enum.Enum):
     KR1 = "КР-1"
     KR2 = "КР-2"
 
-
 class TaskStatusEnum(str, enum.Enum):
     CREATED = "Создано"
     IN_PROGRESS = "В работе"
+    WAITING_PARTS = "Ожидание запчастей"
+    PAUSED = "Пауза"
     COMPLETED = "Завершено"
-
 
 class StageStatusEnum(str, enum.Enum):
     PENDING = "Ожидание"
     IN_PROGRESS = "В работе"
     WAITING_PARTS = "Ожидание запчастей"
+    PAUSED = "Пауза"
     COMPLETED = "Завершено"
+

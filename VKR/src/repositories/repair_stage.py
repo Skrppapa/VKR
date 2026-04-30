@@ -12,11 +12,7 @@ class RepairStageRepository(BaseRepository[RepairStage, RepairStageCreate, Repai
         super().__init__(RepairStage, session)
 
     async def get_with_resources(self, stage_id: int) -> Optional[RepairStage]:
-        """
-        Получить этап со всеми привязанными ресурсами:
-        - Бригады (связь M2M)
-        - Запчасти (через Association Object StagePart -> Part)
-        """
+        """Получить этап со всеми привязанными ресурсами"""
         query = (
             select(self.model)
             .where(self.model.id == stage_id)
