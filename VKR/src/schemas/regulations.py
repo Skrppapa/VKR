@@ -23,6 +23,7 @@ class RegulationBase(BaseModel):
     repair_type: RepairTypeEnum = Field(..., description="Вид ремонта")
     train_series: str = Field(..., max_length=50, description="Серия поезда")
     standard_hours: int = Field(..., gt=0, description="Норма времени в часах")
+    frequency_days: int = Field(..., gt=0, description="Периодичность ремонта в днях")
 
 
 class RegulationCreate(RegulationBase):

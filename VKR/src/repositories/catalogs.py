@@ -26,10 +26,14 @@ class RegulationRepository(BaseRepository[Regulation, RegulationCreate, Regulati
         super().__init__(Regulation, session)
 
     async def get_by_type_and_series(self, repair_type: str, train_series: str) -> Optional[Regulation]:
-        """Метод для проверки дубликатов."""
-        query = select(self.model).where(
-            self.model.repair_type == repair_type,
-            self.model.train_series == train_series
+        """метод для проверки дубликатов и вытаскивания регламента с шаблонами"""
+        query = (
+            select(self.model)
+            .where(
+                self.model.repair_type == repair_type,
+                self.model.train_series == train_series
+            )
+            .options(selectinload(self.model.templates)) # <--- ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТО
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()

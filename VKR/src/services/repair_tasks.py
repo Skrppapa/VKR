@@ -50,7 +50,7 @@ class RepairTaskService:
         # Создаем задание
         new_task = await self.repo.create(task_in)
 
-        # Добавляем этапы в задание
+        # 4. Добавление этапов в созданное задание
         if reg.templates:
             for template in sorted(reg.templates, key=lambda x: x.order_number):
                 new_stage = RepairStage(
@@ -61,8 +61,14 @@ class RepairTaskService:
                 )
                 self.session.add(new_stage)
 
+        # Сохраняем ID до коммита
+        task_id = new_task.id
+
+        # Коммитим транзакцию (new_task становится expired)
         await self.session.commit()
-        return new_task
+
+        # Возвращаем свежий объект из БД
+        return await self.repo.get_by_id(task_id)
 
     async def delete_task(self, task_id: int):
         """Удалить задание"""

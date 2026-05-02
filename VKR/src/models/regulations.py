@@ -12,6 +12,7 @@ class Regulation(Base):
     repair_type: Mapped[RepairTypeEnum] = mapped_column(nullable=False)
     train_series: Mapped[str] = mapped_column(String(50), nullable=False)
     standard_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    frequency_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     stages: Mapped[list["RepairStage"]] = relationship(back_populates="regulation")
     templates: Mapped[list["RegulationStageTemplate"]] = relationship(

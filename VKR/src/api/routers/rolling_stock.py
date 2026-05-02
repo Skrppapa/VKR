@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from src.api.dependencies import get_db_session
 from src.schemas.rolling_stocks import RollingStockCreate, RollingStockResponse,RollingStockUpdate
 from src.services.rolling_stock import RollingStockService
+from src.services.planning import PlanningService
 
 
 router = APIRouter(prefix="/rolling-stocks", tags=["МВПС (Поезда)"])
@@ -37,3 +38,15 @@ async def delete_rolling_stock(train_id: int, session: AsyncSession = Depends(ge
     """Удалить поезд"""
     service = RollingStockService(session)
     await service.delete_train(train_id)
+
+@router.get("/{train_id}/planning")
+async def get_train_planning(
+    train_id: int,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Получить план ремонтов для конкретного МВПС"""
+    service = PlanningService(session)
+    result = await service.get_train_planning_status(train_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="МВПС не найден")
+    return result

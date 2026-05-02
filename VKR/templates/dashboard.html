@@ -1,0 +1,131 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+<div class="container-xl">
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">Аналитика и Управление ремонтом</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+
+        <div class="row row-cards mb-4">
+            <div class="col-sm-4">
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto"><span class="bg-primary text-white avatar"><i class="fa-solid fa-train"></i></span></div>
+                            <div class="col">
+                                <div class="font-weight-medium">Всего МВПС в парке</div>
+                                <div class="text-muted">{{ total_trains }} ед.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4">
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto"><span class="bg-success text-white avatar"><i class="fa-solid fa-wrench"></i></span></div>
+                            <div class="col">
+                                <div class="font-weight-medium">В процессе ремонта</div>
+                                <div class="text-muted">{{ in_progress_count }} заданий</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4">
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto"><span class="bg-warning text-white avatar"><i class="fa-solid fa-pause"></i></span></div>
+                            <div class="col">
+                                <div class="font-weight-medium">На паузе / Ожидают деталей</div>
+                                <div class="text-muted">{{ paused_count }} заданий</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row row-cards">
+
+            <div class="col-md-6">
+                <div class="card" style="height: 100%;">
+                    <div class="card-header"><h3 class="card-title">Текущие ремонты (Live)</h3></div>
+                    <div class="list-group list-group-flush list-group-hoverable">
+                        {% for item in active_tasks %}
+                            <div class="list-group-item">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        {% if item.task.status.value == 'В работе' %}
+                                            <span class="badge bg-success">В работе</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Пауза</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col text-truncate">
+                                        <span class="text-body d-block">Поезд {{ item.task.rolling_stock.series }} (№{{ item.task.rolling_stock.inventory_number }})</span>
+                                        <small class="d-block text-muted text-truncate mt-n1">
+                                            Вид: {{ item.task.repair_type.value }}
+                                        </small>
+                                    </div>
+                                    <div class="col-auto">
+                                        {% if item.is_overdue %}
+                                            <span class="badge bg-danger" title="Время по нормативу вышло!">Просрочено</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="list-group-item text-muted">Сейчас в цеху пусто.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card" style="height: 100%;">
+                    <div class="card-header"><h3 class="card-title">Прогноз плановых ремонтов</h3></div>
+                    <div class="card-body">
+                        <canvas id="repairChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const chartData = {{ chart_data | safe }};
+    const ctx = document.getElementById('repairChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Дней до ближайшего ремонта (меньше 0 = просрочка)',
+                data: chartData.values,
+                backgroundColor: chartData.values.map(v => v < 0 ? '#e74c3c' : '#2ecc71'),
+                borderColor: '#333',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: false }
+            }
+        }
+    });
+</script>
+{% endblock %}
