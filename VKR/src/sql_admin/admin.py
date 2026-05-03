@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from urllib.request import Request
 from sqladmin import ModelView, BaseView, expose
+from src.utils.db_manager import DBManager
 import json
 from sqlalchemy import select
 from src.database import async_session_maker
@@ -74,12 +75,14 @@ class DashboardView(BaseView):
         paused_count = 0
         active_tasks_data = []
 
-        async with async_session_maker() as session:
-            service = PlanningService(session)
+        # 1. Открываем транзакцию через наш менеджер
+        async with DBManager(session_factory=async_session_maker) as db:
+            service = PlanningService(db)
 
             # --- БЛОК ПЛАНИРОВАНИЯ ---
             trains_query = select(RollingStock)
-            trains = (await session.execute(trains_query)).scalars().all()
+            # 3. Обращаемся к сессии внутри менеджера
+            trains = (await db.session.execute(trains_query)).scalars().all()
             total_trains = len(trains)
 
             for train in trains:
@@ -96,7 +99,8 @@ class DashboardView(BaseView):
                 .where(RepairTask.status != TaskStatusEnum.COMPLETED)
                 .options(selectinload(RepairTask.rolling_stock))
             )
-            active_tasks = (await session.execute(active_tasks_query)).scalars().all()
+            # 3. Снова используем db.session.execute
+            active_tasks = (await db.session.execute(active_tasks_query)).scalars().all()
 
             now = datetime.now(timezone.utc)
 

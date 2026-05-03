@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models import RegulationStageTemplate
+from src.models import RegulationStageTemplate, StagePart
 from src.repositories.base import BaseRepository
 from src.models.parts_and_materials import PartAndMaterial
 from src.models.regulations import Regulation
@@ -11,9 +11,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import Optional, List
 
+
 class PartRepository(BaseRepository[PartAndMaterial, PartAndMaterialCreate, PartAndMaterialUpdate]):
     def __init__(self, session: AsyncSession):
         super().__init__(PartAndMaterial, session)
+
+    async def use_part(self, part: PartAndMaterial, quantity: int, stage_id: int):
+        # Уменьшаем кол-во
+        part.stock_quantity -= quantity
+        self.session.add(part)
+
+        # Создаем запись об использовании
+        stage_part = StagePart(stage_id=stage_id, part_id=part.id, quantity_used=quantity)
+        self.session.add(stage_part)
 
 
 class BrigadeRepository(BaseRepository[WorkBrigade, WorkBrigadeCreate, WorkBrigadeUpdate]):
@@ -70,5 +80,11 @@ class RegulationRepository(BaseRepository[Regulation, RegulationCreate, Regulati
             .offset(skip)
             .limit(limit)
         )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_all_by_series(self, train_series: str) -> list[Regulation]:
+        """Получить все регламенты для конкретной серии поезда"""
+        query = select(self.model).where(self.model.train_series == train_series)
         result = await self.session.execute(query)
         return list(result.scalars().all())

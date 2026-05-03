@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from src.repositories.base import BaseRepository
@@ -8,6 +8,7 @@ from src.models.repair_stages import RepairStage
 from src.models.stage_parts import StagePart
 from src.schemas.repair_tasks import RepairTaskCreate, TaskStatusPatch
 from src.models.enums import TaskStatusEnum
+from datetime import datetime
 
 class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStatusPatch]):
     def __init__(self, session: AsyncSession):
@@ -49,3 +50,16 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         ).offset(skip).limit(limit)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def get_last_completed_date(self, train_id: int, repair_type: TaskStatusEnum) -> Optional[datetime]:
+        """Найти дату завершения последнего ремонта указанного типа для поезда"""
+        query = (
+            select(func.max(self.model.actual_end_date))
+            .where(
+                self.model.rolling_stock_id == train_id,
+                self.model.repair_type == repair_type,
+                self.model.status == TaskStatusEnum.COMPLETED
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar()

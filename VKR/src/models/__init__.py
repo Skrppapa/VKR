@@ -8,6 +8,7 @@ from src.models.parts_and_materials import PartAndMaterial
 from src.models.stage_parts import StagePart
 from src.models.regulation_stage_template import RegulationStageTemplate
 from src.models.regulations import Regulation
+from src.models.users import User
 
 __all__ = [
     "Base",
@@ -22,4 +23,5 @@ __all__ = [
     "RepairTypeEnum",
     "TaskStatusEnum",
     "StageStatusEnum",
+    "User"
 ]

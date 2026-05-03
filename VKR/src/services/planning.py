@@ -1,49 +1,39 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from datetime import datetime, timezone, timedelta
-from src.models import RollingStock, Regulation, RepairTask
-from src.models.enums import TaskStatusEnum
+from src.utils.db_manager import DBManager
 
 
 class PlanningService:
-    def __init__(self, session: AsyncSession):
-        self.session = session
+    def __init__(self, db: DBManager):
+        self.db = db
 
     async def get_train_planning_status(self, train_id: int):
-        """Вычисляет статусы по всем видам ремонта для конкретного поезда."""
+        """Вычисление статусов по всем видам ремонта для конкретного поезда"""
 
-        # 1. Получаем поезд
-        train = await self.session.get(RollingStock, train_id)
+        # Получаем поезд
+        train = await self.db.trains.get_by_id(train_id)
         if not train:
             return None
 
-        # 2. Получаем все регламенты для этой серии поезда
-        reg_query = select(Regulation).where(Regulation.train_series == train.series)
-        regulations = (await self.session.execute(reg_query)).scalars().all()
+        # Получаем все регламенты для этой серии
+        regulations = await self.db.regulations.get_all_by_series(train.series)
 
         planning_results = []
         now = datetime.now(timezone.utc)
 
         for reg in regulations:
-            # 3. Ищем последнюю завершенную задачу по этому виду ремонта
-            task_query = (
-                select(func.max(RepairTask.actual_end_date))
-                .where(
-                    RepairTask.rolling_stock_id == train.id,
-                    RepairTask.repair_type == reg.repair_type,
-                    RepairTask.status == TaskStatusEnum.COMPLETED
-                )
+            # Ищем последнюю завершенную задачу через репозиторий
+            last_repair_date = await self.db.tasks.get_last_completed_date(
+                train_id=train.id,
+                repair_type=reg.repair_type
             )
-            last_repair_date = (await self.session.execute(task_query)).scalar()
 
             if not last_repair_date:
                 # Если ремонта еще не было, считаем от даты выпуска поезда
-                # manufacture_date - это date, переводим в datetime с timezone
                 base_date = datetime.combine(train.manufacture_date, datetime.min.time()).replace(tzinfo=timezone.utc)
             else:
                 base_date = last_repair_date
 
-            # Вычисляем дедлайн и оставшиеся дни
+            # Вычисляем оставшиеся дни
             next_repair_date = base_date + timedelta(days=reg.frequency_days)
             days_remaining = (next_repair_date - now).days
 

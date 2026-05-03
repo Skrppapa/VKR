@@ -1,57 +1,51 @@
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from datetime import datetime, timezone, timedelta
 from src.models.repair_stages import RepairStage
-from src.models.stage_parts import StagePart
 from src.models.enums import StageStatusEnum, TaskStatusEnum
 from src.schemas.repair_stages import StageStatusPatch
-from src.repositories.repair_stage import RepairStageRepository
-from src.repositories.catalogs import PartRepository, RegulationRepository
-from src.repositories.repair_tasks import RepairTaskRepository
+from src.utils.db_manager import DBManager
 
 
 class RepairStageService:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-        self.stage_repo = RepairStageRepository(session)
-        self.part_repo = PartRepository(session)
-        self.task_repo = RepairTaskRepository(session)
-        self.reg_repo = RegulationRepository(session)
+    def __init__(self, db: DBManager):
+        self.db = db
 
-    async def assign_part_to_stage(self, stage_id: int, part_id: int, quantity: int):
-        """Списание детали со склада и привязка к этапу."""
-
-        stage = await self.stage_repo.get_by_id(stage_id)
+    async def add_part_to_repair_stage(self, stage_id: int, part_id: int, quantity: int):
+        # 1. Проверяем существование этапа
+        stage = await self.db.stages.get_by_id(stage_id)
         if not stage:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
 
-        part = await self.part_repo.get_by_id(part_id)
+        # 2. Получаем деталь
+        part = await self.db.parts.get_by_id(part_id)
         if not part:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Деталь не найдена в базе")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Деталь не найдена")
 
+        # 3. Валидация остатка (Бизнес-логика остается в сервисе)
         if part.stock_quantity < quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Недостаточно деталей на складе. Доступно: {part.stock_quantity}, запрошено: {quantity}"
+                detail=f"Недостаточно на складе. Доступно: {part.stock_quantity}, нужно: {quantity}"
             )
 
-        part.stock_quantity -= quantity
-        self.session.add(part)
+        # 4. Вызываем метод репозитория для выполнения механических действий (add, создание связи)
+        await self.db.parts.use_part(part, quantity, stage_id)
 
-        stage_part = StagePart(stage_id=stage_id, part_id=part_id, quantity_used=quantity)
-        self.session.add(stage_part)
+        # 5. Фиксируем транзакцию одной командой
+        await self.db.commit()
 
-        await self.session.commit()
+
+        await self.db.commit()
         return {"message": "Детали успешно списаны и привязаны к этапу"}
 
     async def update_stage_status(self, stage_id: int, status_data: StageStatusPatch) -> RepairStage:
         """Обновление статуса этапа"""
 
-        stage = await self.stage_repo.get_by_id(stage_id)
+        stage = await self.db.stages.get_by_id(stage_id)
         if not stage:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
 
-        task = await self.task_repo.get_with_stages(stage.repair_task_id)
+        task = await self.db.tasks.get_with_stages(stage.repair_task_id)
         if not task:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Родительское задание не найдено")
 
@@ -65,6 +59,10 @@ class RepairStageService:
             return stage
 
         # Ожидание запчастей или пауза
+
+        new_status: StageStatusEnum = status_data.status
+        old_status: StageStatusEnum = stage.status
+
         if new_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS]:
             if new_status == StageStatusEnum.PAUSED and not status_data.pause_reason:
                 raise HTTPException(
@@ -115,7 +113,7 @@ class RepairStageService:
 
                 # Получаем норматив через репозиторий
                 if stage.regulation_id:
-                    reg = await self.reg_repo.get_by_id(stage.regulation_id)
+                    reg = await self.db.regulations.get_by_id(stage.regulation_id)
                     if reg:
                         task.planned_end_date = task.start_date + timedelta(hours=reg.standard_hours)
             else:
@@ -133,8 +131,6 @@ class RepairStageService:
                 task.actual_end_date = datetime.now(timezone.utc)
 
         stage.status = new_status
-        self.session.add(stage)
-        self.session.add(task)
-        await self.session.commit()
+        await self.db.commit()
 
         return stage

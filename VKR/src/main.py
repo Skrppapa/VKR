@@ -1,24 +1,23 @@
 import sys
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.api.routers.rolling_stock import router as rolling_stock_router
-from src.api.routers.catalogs import router as catalogs_router
-from src.api.routers.repair_task import router as repair_task_router
-from src.api.routers.repair_stage import router as repair_stage_router
+from src.api.rolling_stock import router as rolling_stock_router
+from src.api.catalogs import router as catalogs_router
+from src.api.repair_task import router as repair_task_router
+from src.api.repair_stage import router as repair_stage_router
+from src.api.auth import router as auth
+from src.security import get_current_user
 
 
 
 from sqladmin import Admin
 from src.database import engine
-from src.admin import DashboardView
-from src.admin import (
-    RollingStockAdmin, RegulationAdmin,
-    PartAndMaterialAdmin, WorkBrigadeAdmin,
-    RepairTaskAdmin, RepairStageAdmin
-)
+from src.sql_admin.admin import DashboardView
+from src.sql_admin.admin_auth import AdminAuth
+from src.sql_admin.admin import (RollingStockAdmin, RegulationAdmin, PartAndMaterialAdmin, WorkBrigadeAdmin, RepairTaskAdmin, RepairStageAdmin)
 
 
 app = FastAPI(
@@ -34,11 +33,14 @@ templates_path = os.path.join(BASE_DIR, "templates")
 #===========Импорты==========
 
 
+authentication_backend = AdminAuth(secret_key="another-super-secret-key")
+
 admin = Admin(
     app,
     engine,
     title="Панель Управления Депо",
-    templates_dir=templates_path
+    templates_dir=templates_path,
+    authentication_backend=authentication_backend
 )
 
 
@@ -51,13 +53,11 @@ admin.add_view(RepairTaskAdmin)
 admin.add_view(RepairStageAdmin)
 
 
-app.include_router(rolling_stock_router, prefix="/api/v1")
-app.include_router(catalogs_router, prefix="/api/v1")
-app.include_router(repair_task_router, prefix="/api/v1")
-app.include_router(repair_stage_router, prefix="/api/v1")
-
-
-
+app.include_router(auth, prefix="/api/v1")
+app.include_router(rolling_stock_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(catalogs_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(repair_task_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(repair_stage_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 
 
 if __name__ == "__main__":
