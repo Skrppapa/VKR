@@ -7,8 +7,10 @@ from src.schemas.repair_stages import RepairStageResponse
 class RepairTaskBase(BaseModel):
     repair_type: RepairTypeEnum
 
-class RepairTaskCreate(RepairTaskBase):
+class RepairTaskCreate(BaseModel):
     rolling_stock_id: int
+    repair_type: RepairTypeEnum
+    brigade_id: int
 
 class TaskStatusPatch(BaseModel):
     status: TaskStatusEnum
@@ -16,6 +18,8 @@ class TaskStatusPatch(BaseModel):
 class RepairTaskResponse(RepairTaskBase):
     id: int
     rolling_stock_id: int
+    brigade_id: Optional[int] = None
+    master_name_snapshot: Optional[str] = "Не указан"  # Для старых записей
     status: TaskStatusEnum
     start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None

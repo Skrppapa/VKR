@@ -10,5 +10,8 @@ class WorkBrigade(Base):
 
     id: Mapped[int_pk]
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    master_name: Mapped[str] = mapped_column(String(150), nullable=True)
+    master_id_number: Mapped[str] = mapped_column(String(7), nullable=True)
 
     stages: Mapped[list["RepairStage"]] = relationship(secondary=stage_brigade_association, back_populates="brigades")
+    repair_tasks: Mapped[list["RepairTask"]] = relationship(back_populates="brigade")
