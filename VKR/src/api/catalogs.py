@@ -6,95 +6,95 @@ from src.schemas.parts_and_materials import PartAndMaterialCreate, PartAndMateri
 from src.schemas.regulations import RegulationCreate, RegulationUpdate, RegulationResponse
 
 
-router = APIRouter(prefix="/catalogs", tags=["Справочники"])
+router = APIRouter(prefix="/catalogs")
 
 # --- БРИГАДЫ ---
-@router.get("/brigades", response_model=list[WorkBrigadeResponse])
+@router.get("/brigades", tags=["Справочники: Бригады"], response_model=list[WorkBrigadeResponse])
 async def get_brigades(db: DBDep, skip: int = 0, limit: int = 100):
     service = BrigadeService(db)
     return await service.get_all(skip, limit)
 
 
-@router.get("/brigades/{brigade_id}", response_model=WorkBrigadeResponse)
+@router.get("/brigades/{brigade_id}", tags=["Справочники: Бригады"], response_model=WorkBrigadeResponse)
 async def get_brigade_by_id(brigade_id: int, db: DBDep):
     service = BrigadeService(db)
     return await service.get_brigade_by_id(brigade_id)
 
 
-@router.post("/brigades", response_model=WorkBrigadeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/brigades", tags=["Справочники: Бригады"], response_model=WorkBrigadeResponse, status_code=status.HTTP_201_CREATED)
 async def create_brigade(data_in: WorkBrigadeCreate, db: DBDep):
     service = BrigadeService(db)
     return await service.create(data_in)
 
 
-@router.patch("/brigades/{brigade_id}", response_model=WorkBrigadeResponse)
+@router.patch("/brigades/{brigade_id}", tags=["Справочники: Бригады"], response_model=WorkBrigadeResponse)
 async def update_brigade(id: int, data: WorkBrigadeUpdate, db: DBDep):
     service = BrigadeService(db)
     return await service.update(id, data)
 
 
-@router.delete("/brigades/{brigade_id}", status_code=204)
+@router.delete("/brigades/{brigade_id}", tags=["Справочники: Бригады"], status_code=204)
 async def delete_brigade(id: int, db: DBDep):
     service = BrigadeService(db)
     await service.delete(id)
 
 
 # --- ЗАПЧАСТИ ---
-@router.get("/parts", response_model=list[PartAndMaterialResponse])
+@router.get("/parts", tags=["Справочники: Запчасти"], response_model=list[PartAndMaterialResponse])
 async def get_parts(db: DBDep, skip: int = 0, limit: int = 100):
     service = PartService(db)
     return await service.get_all(skip, limit)
 
 
-@router.get("/parts/{part_id}", response_model=PartAndMaterialResponse)
+@router.get("/parts/{part_id}", tags=["Справочники: Запчасти"], response_model=PartAndMaterialResponse)
 async def get_part_by_id(part_id: int, db: DBDep):
     service = PartService(db)
     return await service.get_part_by_id(part_id)
 
 
-@router.post("/parts", response_model=PartAndMaterialResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/parts", tags=["Справочники: Запчасти"], response_model=PartAndMaterialResponse, status_code=status.HTTP_201_CREATED)
 async def create_part(data_in: PartAndMaterialCreate, db: DBDep):
     service = PartService(db)
     return await service.create(data_in)
 
 
-@router.patch("/parts/{part_id}", response_model=PartAndMaterialResponse)
+@router.patch("/parts/{part_id}", tags=["Справочники: Запчасти"], response_model=PartAndMaterialResponse)
 async def update_part(id: int, data: PartAndMaterialUpdate, db: DBDep):
     service = PartService(db)
     return await service.update(id, data)
 
 
-@router.delete("/parts/{part_id}", status_code=204)
+@router.delete("/parts/{part_id}", tags=["Справочники: Запчасти"], status_code=204)
 async def delete_part(id: int, db: DBDep):
     service = PartService(db)
     await service.delete(id)
 
 # --- НОРМАТИВЫ ---
-@router.get("/regulations", response_model=list[RegulationResponse])
+@router.get("/regulations", tags=["Справочники: Регламенты"], response_model=list[RegulationResponse])
 async def get_regulations(db: DBDep, skip: int = 0, limit: int = 100):
     service = RegulationService(db)
     return await service.get_all(skip, limit)
 
 
-@router.get("/regulations/{regulation_id}", response_model=RegulationResponse)
+@router.get("/regulations/{regulation_id}", tags=["Справочники: Регламенты"], response_model=RegulationResponse)
 async def get_regulation_by_id(regulation_id: int, db: DBDep):
     service = RegulationService(db)
     return await service.get_regulation_by_id(regulation_id)
 
 
-@router.post("/regulations", response_model=RegulationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/regulations", tags=["Справочники: Регламенты"], response_model=RegulationResponse, status_code=status.HTTP_201_CREATED)
 async def create_regulation(data_in: RegulationCreate, db: DBDep):
     service = RegulationService(db)
     return await service.create(data_in)
 
 
-@router.patch("/regulations/{regulation_id}", response_model=RegulationResponse)
+@router.patch("/regulations/{regulation_id}", tags=["Справочники: Регламенты"], response_model=RegulationResponse)
 async def update_regulation(id: int, data: RegulationUpdate, db: DBDep):
     service = RegulationService(db)
     return await service.update(id, data)
 
 
-@router.delete("/regulations/{regulation_id}", status_code=204)
+@router.delete("/regulations/{regulation_id}", tags=["Справочники: Регламенты"], status_code=204)
 async def delete_regulation(id: int, db: DBDep):
     service = RegulationService(db)
     await service.delete(id)

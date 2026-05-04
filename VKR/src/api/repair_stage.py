@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from src.api.dependencies import DBDep
 from src.services.repair_stage import RepairStageService
-from src.schemas.repair_stages import RepairStageResponse, StageStatusPatch, RepairStageUpdate
+from src.schemas.repair_stages import RepairStageResponse, StageStatusPatch
 
 router = APIRouter(prefix="/repair-stages", tags=["Этапы ремонта"])
 
@@ -20,10 +20,5 @@ async def update_stage_status(stage_id: int, status_data: StageStatusPatch, db: 
     service = RepairStageService(db)
     return await service.update_stage_status(stage_id, status_data)
 
-@router.patch("/{stage_id}", response_model=RepairStageResponse)
-async def update_stage(stage_id: int, data: RepairStageUpdate, db: DBDep):
-    """Обновление текстовых полей этапа (название)."""
-    service = RepairStageService(db)
-    return await service.update_stage(stage_id, data)
 
 

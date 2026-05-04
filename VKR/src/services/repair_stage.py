@@ -11,31 +11,23 @@ class RepairStageService:
         self.db = db
 
     async def add_part_to_repair_stage(self, stage_id: int, part_id: int, quantity: int):
-        # 1. Проверяем существование этапа
         stage = await self.db.stages.get_by_id(stage_id)
         if not stage:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
 
-        # 2. Получаем деталь
         part = await self.db.parts.get_by_id(part_id)
         if not part:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Деталь не найдена")
 
-        # 3. Валидация остатка (Бизнес-логика остается в сервисе)
         if part.stock_quantity < quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Недостаточно на складе. Доступно: {part.stock_quantity}, нужно: {quantity}"
             )
 
-        # 4. Вызываем метод репозитория для выполнения механических действий (add, создание связи)
         await self.db.parts.use_part(part, quantity, stage_id)
+        await self.db.commit()  # Оставили только один коммит
 
-        # 5. Фиксируем транзакцию одной командой
-        await self.db.commit()
-
-
-        await self.db.commit()
         return {"message": "Детали успешно списаны и привязаны к этапу"}
 
     async def update_stage_status(self, stage_id: int, status_data: StageStatusPatch) -> RepairStage:
@@ -49,8 +41,13 @@ class RepairStageService:
         if not task:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Родительское задание не найдено")
 
-        task_stages = sorted(task.stages, key=lambda s: s.id)
-        current_index = next(i for i, s in enumerate(task_stages) if s.id == stage.id)
+        # --- ЗАЩИТА 1: Блокировка архива ---
+        # Если вся задача завершена, запрещаем трогать ее этапы
+        if task.status == TaskStatusEnum.COMPLETED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя изменять этапы завершенной (архивной) задачи."
+            )
 
         new_status = status_data.status
         old_status = stage.status
@@ -58,11 +55,18 @@ class RepairStageService:
         if new_status == old_status:
             return stage
 
+        # --- ЗАЩИТА 2: Блокировка отката ---
+        # Запрещаем менять статус этапа, который уже был успешно завершен
+        if old_status == StageStatusEnum.COMPLETED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Этот этап уже завершен. Откат статуса невозможен."
+            )
+
+        task_stages = sorted(task.stages, key=lambda s: s.id)
+        current_index = next(i for i, s in enumerate(task_stages) if s.id == stage.id)
+
         # Ожидание запчастей или пауза
-
-        new_status: StageStatusEnum = status_data.status
-        old_status: StageStatusEnum = stage.status
-
         if new_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS]:
             if new_status == StageStatusEnum.PAUSED and not status_data.pause_reason:
                 raise HTTPException(
@@ -80,12 +84,22 @@ class RepairStageService:
 
         # Запуск этапа В работу
         elif new_status == StageStatusEnum.IN_PROGRESS:
+
+            # --- ЗАЩИТА 3: Строгая проверка очереди ---
+            # Проверяем ВСЕ предыдущие этапы, а не только один
             if current_index > 0:
-                prev_stage = task_stages[current_index - 1]
-                if prev_stage.status != StageStatusEnum.COMPLETED:
+                # Собираем список всех предыдущих этапов, которые еще НЕ завершены
+                incomplete_prev_stages = [
+                    s for s in task_stages[:current_index]
+                    if s.status != StageStatusEnum.COMPLETED
+                ]
+
+                if incomplete_prev_stages:
+                    # Выводим названия незавершенных этапов, чтобы было понятно, где затык
+                    names = ", ".join([s.name for s in incomplete_prev_stages])
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Нельзя начать этот этап. Предыдущий этап '{prev_stage.name}' не завершен."
+                        detail=f"Нельзя начать этот этап. Не завершены предыдущие этапы: {names}"
                     )
 
             # Сценарий 1: Снятие с паузы
@@ -111,7 +125,6 @@ class RepairStageService:
                 task.start_date = datetime.now(timezone.utc)
                 task.status = TaskStatusEnum.IN_PROGRESS
 
-                # Получаем норматив через репозиторий
                 if stage.regulation_id:
                     reg = await self.db.regulations.get_by_id(stage.regulation_id)
                     if reg:

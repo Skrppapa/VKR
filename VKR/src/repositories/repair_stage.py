@@ -7,6 +7,7 @@ from src.models.repair_stages import RepairStage
 from src.models.stage_parts import StagePart
 from src.schemas.repair_stages import RepairStageCreate, RepairStageUpdate
 
+
 class RepairStageRepository(BaseRepository[RepairStage, RepairStageCreate, RepairStageUpdate]):
     def __init__(self, session: AsyncSession):
         super().__init__(RepairStage, session)

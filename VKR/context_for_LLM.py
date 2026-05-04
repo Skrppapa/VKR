@@ -1,7 +1,18 @@
 from pathlib import Path
 
 # Папки и файлы, которые нужно собрать
-TARGET_DIRS = ["src/models", "src/schemas", "src/repositories", "src/services", "src/api/routers"]
+TARGET_DIRS = [
+    "src/api",
+    "src/models",
+    "src/repositories",
+    "src/schemas",
+    "src/services",
+    "src/sql_admin",
+    "src/utils",
+    "src/config.py",
+    "src/database.py",
+    "src/main.py",
+    "src/security.py"]
 OUTPUT_FILE = "llm_context.md"
 
 

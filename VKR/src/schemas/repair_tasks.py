@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 from src.models.enums import RepairTypeEnum, TaskStatusEnum
 from src.schemas.repair_stages import RepairStageResponse
 
@@ -23,6 +23,12 @@ class RepairTaskResponse(RepairTaskBase):
     total_paused_seconds: int = 0
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer('start_date', 'planned_end_date', "actual_end_date", check_fields=False)
+    def format_datetime(self, dt: Optional[datetime], _info) -> Optional[str]:
+        if dt:
+            return dt.strftime('%d.%m.%Y %H:%M')
+        return None
 
 
 # Расширенный ответ (например, когда запрашивают конкретное задание по ID)

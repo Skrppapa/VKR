@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from fastapi import HTTPException, status
 from src.utils.db_manager import DBManager
 
 
@@ -11,8 +12,12 @@ class PlanningService:
 
         # Получаем поезд
         train = await self.db.trains.get_by_id(train_id)
+
         if not train:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="МВПС не найден"
+            )
 
         # Получаем все регламенты для этой серии
         regulations = await self.db.regulations.get_all_by_series(train.series)

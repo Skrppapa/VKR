@@ -1,5 +1,6 @@
 from fastapi import APIRouter, status, HTTPException
 from src.api.dependencies import DBDep
+from src.schemas.planning import TrainPlanningResponse
 from src.schemas.rolling_stocks import RollingStockCreate, RollingStockResponse,RollingStockUpdate
 from src.services.rolling_stock import RollingStockService
 from src.services.planning import PlanningService
@@ -37,11 +38,8 @@ async def delete_rolling_stock(train_id: int, db: DBDep):
     service = RollingStockService(db)
     await service.delete_train(train_id)
 
-@router.get("/{train_id}/planning")
+@router.get("/{train_id}/planning", response_model=TrainPlanningResponse)
 async def get_train_planning(train_id: int, db: DBDep):
     """Получить план ремонтов для конкретного МВПС"""
     service = PlanningService(db)
-    result = await service.get_train_planning_status(train_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="МВПС не найден")
-    return result
+    return await service.get_train_planning_status(train_id)

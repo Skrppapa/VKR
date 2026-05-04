@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from src.models.enums import StageStatusEnum
 
 # Схема для детали
@@ -35,10 +35,9 @@ class StageStatusPatch(BaseModel):
                                         description="Причина паузы. Обязательна, если статус PAUSED")
 
 
-class RepairStageUpdate(BaseModel):
+class RepairStageUpdate(RepairStageBase):
     name: Optional[str] = None
     status: Optional[StageStatusEnum] = None
-    regulation_id: Optional[int] = None
 
 
 # Схема ответа (Чтение этапа)
@@ -53,6 +52,12 @@ class RepairStageResponse(RepairStageBase):
     pause_reason: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer('start_time', 'end_time', "last_paused_at", check_fields=False)
+    def format_datetime(self, dt: Optional[datetime], _info) -> Optional[str]:
+        if dt:
+            return dt.strftime('%d.%m.%Y %H:%M')
+        return None
 
 
 
