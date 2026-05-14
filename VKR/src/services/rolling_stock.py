@@ -14,7 +14,7 @@ class RollingStockService:
         if existing_train:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Поезд с номером {train_in.inventory_number} уже существует."
+                detail=f"МВПС с номером {train_in.inventory_number} уже существует."
             )
 
         # Создание
@@ -29,17 +29,14 @@ class RollingStockService:
     async def get_train_by_id(self, train_id: int) -> RollingStock:
         train = await self.db.trains.get_by_id(train_id)
         if not train:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="МВПС не найден."
-            )
+            raise HTTPException( 404, "МВПС не найден.")
         return train
 
 
     async def update_train(self, train_id: int, update_data: RollingStockUpdate) -> RollingStock:
         train = await self.db.trains.get_by_id(train_id)
         if not train:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="МВПС не найден")
+            raise HTTPException(404, "МВПС не найден")
         updated_train = await self.db.trains.update(train, update_data)
         await self.db.commit()
         return updated_train
@@ -48,6 +45,6 @@ class RollingStockService:
     async def delete_train(self, train_id: int) -> None:
         train = await self.db.trains.get_by_id(train_id)
         if not train:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="МВПС не найден")
+            raise HTTPException(404, "МВПС не найден")
         await self.db.trains.delete(train_id)
         await self.db.commit()

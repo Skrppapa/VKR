@@ -20,6 +20,11 @@ class RepairTask(Base):
     actual_end_date: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     total_paused_seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
+
     rolling_stock: Mapped["RollingStock"] = relationship(back_populates="repair_tasks")
     brigade: Mapped[Optional["WorkBrigade"]] = relationship(back_populates="repair_tasks")
     stages: Mapped[list["RepairStage"]] = relationship(back_populates="repair_task", cascade="all, delete-orphan")
+
+    @property
+    def train_series(self) -> str:
+        return self.rolling_stock.series if self.rolling_stock else "Неизвестно"

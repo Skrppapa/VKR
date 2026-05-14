@@ -1,0 +1,41 @@
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Словарь точных совпадений
+        const translations = {
+            "Save": "Сохранить",
+            "Save and continue editing": "Сохранить и продолжить",
+            "Save and add another": "Сохранить и добавить еще",
+            "Cancel": "Отмена",
+            "Delete": "Удалить",
+            "Export": "Экспорт",
+            "Details": "Подробнее",
+            "Edit": "Изменить",
+            "Go Back": "Назад"
+        };
+
+        // 1. Перевод кнопок и элементов выпадающих меню
+        document.querySelectorAll('.btn, .dropdown-item').forEach(btn => {
+            let text = btn.textContent.trim();
+
+            // Если кнопка содержит "New ...", например "New Бригада"
+            if (text.startsWith("New ")) {
+                btn.innerHTML = btn.innerHTML.replace("New", "Добавить");
+            }
+            else if (translations[text]) {
+                btn.innerHTML = btn.innerHTML.replace(text, translations[text]);
+            }
+        });
+
+        // 2. Перевод строки поиска
+        document.querySelectorAll('input[placeholder="Search"]').forEach(input => {
+            input.setAttribute("placeholder", "Поиск...");
+        });
+
+        // 3. Перевод текста пустой таблицы
+        document.querySelectorAll('.text-muted').forEach(el => {
+            if (el.textContent.includes("No records found")) {
+                el.textContent = "Записи не найдены";
+            }
+        });
+    });
+</script>

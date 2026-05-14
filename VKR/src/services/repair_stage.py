@@ -13,11 +13,11 @@ class RepairStageService:
     async def add_part_to_repair_stage(self, stage_id: int, part_id: int, quantity: int):
         stage = await self.db.stages.get_by_id(stage_id)
         if not stage:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
+            raise HTTPException(404, "Этап не найден")
 
         part = await self.db.parts.get_by_id(part_id)
         if not part:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Деталь не найдена")
+            raise HTTPException(404, "Деталь не найдена")
 
         if part.stock_quantity < quantity:
             raise HTTPException(
@@ -26,7 +26,7 @@ class RepairStageService:
             )
 
         await self.db.parts.use_part(part, quantity, stage_id)
-        await self.db.commit()  # Оставили только один коммит
+        await self.db.commit()
 
         return {"message": "Детали успешно списаны и привязаны к этапу"}
 
@@ -35,14 +35,14 @@ class RepairStageService:
 
         stage = await self.db.stages.get_by_id(stage_id)
         if not stage:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Этап не найден")
+            raise HTTPException(404, "Этап не найден")
 
         task = await self.db.tasks.get_with_stages(stage.repair_task_id)
         if not task:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Родительское задание не найдено")
+            raise HTTPException(404, "Родительское задание не найдено")
 
-        # --- ЗАЩИТА 1: Блокировка архива ---
-        # Если вся задача завершена, запрещаем трогать ее этапы
+
+        # Защита Архива от изменений
         if task.status == TaskStatusEnum.COMPLETED:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -55,8 +55,7 @@ class RepairStageService:
         if new_status == old_status:
             return stage
 
-        # --- ЗАЩИТА 2: Блокировка отката ---
-        # Запрещаем менять статус этапа, который уже был успешно завершен
+        # Зашита завершенного этапа от изменений
         if old_status == StageStatusEnum.COMPLETED:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -85,24 +84,21 @@ class RepairStageService:
         # Запуск этапа В работу
         elif new_status == StageStatusEnum.IN_PROGRESS:
 
-            # --- ЗАЩИТА 3: Строгая проверка очереди ---
-            # Проверяем ВСЕ предыдущие этапы, а не только один
+            # Проверка очередности этапов
             if current_index > 0:
-                # Собираем список всех предыдущих этапов, которые еще НЕ завершены
                 incomplete_prev_stages = [
                     s for s in task_stages[:current_index]
                     if s.status != StageStatusEnum.COMPLETED
                 ]
 
                 if incomplete_prev_stages:
-                    # Выводим названия незавершенных этапов, чтобы было понятно, где затык
                     names = ", ".join([s.name for s in incomplete_prev_stages])
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Нельзя начать этот этап. Не завершены предыдущие этапы: {names}"
                     )
 
-            # Сценарий 1: Снятие с паузы
+            # Вариант 1: Снятие с паузы
             if old_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS] and stage.last_paused_at:
                 pause_duration = datetime.now(timezone.utc) - stage.last_paused_at
                 seconds = int(pause_duration.total_seconds())
@@ -116,11 +112,10 @@ class RepairStageService:
                 stage.last_paused_at = None
                 task.status = TaskStatusEnum.IN_PROGRESS
 
-            # Сценарий 2: Первый старт этапа
+            # Вариант 2: Первый старт этапа
             if not stage.start_time:
                 stage.start_time = datetime.now(timezone.utc)
 
-            # Если это самый первый этап всей задачи - стартуем Задание
             if current_index == 0 and not task.start_date:
                 task.start_date = datetime.now(timezone.utc)
                 task.status = TaskStatusEnum.IN_PROGRESS

@@ -12,7 +12,15 @@ TARGET_DIRS = [
     "src/config.py",
     "src/database.py",
     "src/main.py",
-    "src/security.py"]
+    "src/security.py",
+    "templates/admin_create_task.html",
+    "templates/base.html",
+    "templates/dashboard.html",
+    "templates/login.html",
+    "templates/workspace.html",
+    ]
+
+
 OUTPUT_FILE = "llm_context.md"
 
 

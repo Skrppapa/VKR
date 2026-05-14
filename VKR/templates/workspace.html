@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Рабочее место мастера{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h2>Активные задания</h2>
+    <p>Текущие ремонты подвижного состава в цеху</p>
+</hgroup>
+
+<div id="tasks-container" aria-busy="true"></div>
+
+<dialog id="part-modal">
+  <article>
+    <header>
+      <button aria-label="Close" class="close" onclick="closePartModal()"></button>
+      <strong>Списание запчастей со склада</strong>
+    </header>
+
+    <div style="margin-bottom: 1rem;">
+      <label for="part-select">Выберите деталь (Номенклатура)</label>
+      <select id="part-select" required>
+        <option value="" disabled selected>Загрузка каталога...</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <label for="part-quantity">Количество</label>
+      <input type="number" id="part-quantity" min="1" value="1" required>
+    </div>
+
+    <footer>
+      <button class="secondary outline" onclick="closePartModal()">Отмена</button>
+      <button onclick="assignPart()">Списать и привязать</button>
+    </footer>
+  </article>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const API_BASE = '/api/v1';
+
+    // --- ЛОГИКА АВТОРИЗАЦИИ ---
+    // 1. При загрузке страницы проверяем, есть ли токен
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login'; // Если нет, выкидываем на логин
+    }
+
+    // 2. Создаем универсальную функцию-обертку для fetch
+    // Она автоматически добавляет токен и обрабатывает ошибку 401
+    async function fetchWithAuth(url, options = {}) {
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            ...(options.headers || {})
+        };
+
+        const response = await fetch(url, { ...options, headers });
+
+        if (response.status === 401) {
+            // Токен недействителен (или истек) - очищаем хранилище и выкидываем на логин
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+            throw new Error("Unauthorized");
+        }
+
+        return response;
+    }
+
+    // Переменные для хранения контекста модального окна
+    let currentModalStageId = null;
+    let currentModalTaskId = null;
+
+    document.addEventListener('DOMContentLoaded', loadActiveTasks);
+
+    // --- 1. ЗАГРУЗКА ЗАДАНИЙ (Без изменений) ---
+    async function loadActiveTasks() {
+        const container = document.getElementById('tasks-container');
+        try {
+            const response = await fetchWithAuth(`${API_BASE}/repair-tasks/active`);
+            if (!response.ok) throw new Error('Network error');
+            const tasks = await response.json();
+
+            container.setAttribute('aria-busy', 'false');
+            container.innerHTML = '';
+
+            if (tasks.length === 0) {
+                container.innerHTML = '<p>В данный момент нет активных заданий.</p>';
+                return;
+            }
+
+            tasks.forEach(task => {
+                const card = document.createElement('article');
+                card.className = 'apple-card';
+
+                let badgeClass = '';
+                if (task.status === 'В работе') badgeClass = 'in-progress';
+                if (task.status === 'Пауза' || task.status === 'Ожидание запчастей') badgeClass = 'paused';
+
+                card.innerHTML = `
+                    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="margin: 0;">Ремонт: ${task.repair_type}</h4>
+                        <span class="badge ${badgeClass}">${task.status}</span>
+                    </header>
+                    <div style="margin-bottom: 1rem; font-size: 0.9rem; color: #86868b;">
+                        <div><strong>Серия МВПС:</strong> ${task.train_series}</div>
+                        <div><strong>Мастер:</strong> ${task.master_name_snapshot}</div>
+                    </div>
+                    <footer>
+                        <details id="details-${task.id}" ontoggle="if(this.open) loadStages(${task.id})">
+                            <summary role="button" class="outline secondary" style="border-radius: 12px; margin-bottom: 0;">Управление этапами</summary>
+                            <div id="stages-container-${task.id}" style="padding-top: 1rem;">
+                                <div aria-busy="true"></div>
+                            </div>
+                        </details>
+                    </footer>
+                `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            // Добавляем вот эту строчку, чтобы остановить крутилку:
+            container.setAttribute('aria-busy', 'false');
+            container.innerHTML = '<p style="color: #ff3b30;">Не удалось загрузить задания.</p>';
+        }
+    }
+
+    // --- 2. ЗАГРУЗКА ЭТАПОВ (Добавлена логика для запчастей) ---
+    async function loadStages(taskId) {
+        const container = document.getElementById(`stages-container-${taskId}`);
+        try {
+            const response = await fetchWithAuth(`${API_BASE}/repair-tasks/${taskId}/full`);
+            if (!response.ok) throw new Error('Network error');
+            const taskData = await response.json();
+
+            let stagesHtml = '<div style="display: flex; flex-direction: column;">';
+
+            taskData.stages.forEach(stage => {
+                let actionsHtml = '';
+                let rowClass = 'stage-row';
+
+                if (stage.status === 'Ожидание') {
+                    actionsHtml = `<button class="outline" style="padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0;" onclick="changeStageStatus(${stage.id}, 'В работе', ${taskId})">Начать</button>`;
+                } else if (stage.status === 'В работе') {
+                    // Этап в работе: можно завершить, поставить на обычную паузу или перевести в ожидание запчастей
+                    actionsHtml = `
+                        <button class="outline" style="color: #34c759; border-color: #34c759; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="changeStageStatus(${stage.id}, 'Завершено', ${taskId})">Завершить</button>
+                        <button class="outline" style="color: #ff9f0a; border-color: #ff9f0a; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="changeStageStatus(${stage.id}, 'Пауза', ${taskId})">Пауза</button>
+                        <button class="outline" style="color: #af52de; border-color: #af52de; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0;" onclick="changeStageStatus(${stage.id}, 'Ожидание запчастей', ${taskId})">Нет деталей</button>
+                    `;
+                } else if (stage.status === 'Ожидание запчастей') {
+                    rowClass += ' paused';
+                    // Этап ждет детали: появляется кнопка запроса со склада
+                    actionsHtml = `
+                        <button style="background: #af52de; border-color: #af52de; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="openPartModal(${stage.id}, ${taskId})">+ Взять со склада</button>
+                        <button class="outline" style="color: #007aff; border-color: #007aff; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0;" onclick="changeStageStatus(${stage.id}, 'В работе', ${taskId})">Возобновить</button>
+                    `;
+                } else if (stage.status === 'Пауза') {
+                    rowClass += ' paused';
+                    actionsHtml = `<button class="outline" style="color: #007aff; border-color: #007aff; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0;" onclick="changeStageStatus(${stage.id}, 'В работе', ${taskId})">Возобновить</button>`;
+                } else if (stage.status === 'Завершено') {
+                    rowClass += ' completed';
+                }
+
+                // Отображаем списанные детали, если они есть
+                let partsHtml = '';
+                if (stage.part_associations && stage.part_associations.length > 0) {
+                    partsHtml = '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #86868b;">🛠 Использовано: ';
+                    const partsList = stage.part_associations.map(pa => `${pa.part.nomenclature} (${pa.quantity_used} шт.)`);
+                    partsHtml += partsList.join(', ') + '</div>';
+                }
+
+                stagesHtml += `
+                    <div class="${rowClass}">
+                        <div>
+                            <strong style="display: block; font-size: 0.95rem;">${stage.name}</strong>
+                            <small class="badge" style="font-size: 0.7rem; margin-top: 0.3rem; display: inline-block;">${stage.status}</small>
+                            ${partsHtml}
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                            ${actionsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            stagesHtml += '</div>';
+            container.innerHTML = stagesHtml;
+        } catch (e) {
+            container.innerHTML = '<small style="color:red;">Ошибка загрузки этапов</small>';
+        }
+    }
+
+    // --- 3. ИЗМЕНЕНИЕ СТАТУСА (Без изменений) ---
+    async function changeStageStatus(stageId, newStatus, taskId) {
+        let reason = null;
+        if (newStatus === 'Пауза') {
+            reason = prompt("Укажите причину постановки на паузу:");
+            if (!reason) return;
+        }
+
+        try {
+            const response = await fetchWithAuth(`${API_BASE}/repair-stages/${stageId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus, pause_reason: reason })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                alert("Ошибка: " + err.detail);
+                return;
+            }
+            await loadStages(taskId);
+            loadActiveTasks();
+        } catch (e) {
+            alert("Ошибка соединения с сервером");
+        }
+    }
+
+    // --- 4. ЛОГИКА МОДАЛЬНОГО ОКНА ДЛЯ ЗАПЧАСТЕЙ ---
+    async function openPartModal(stageId, taskId) {
+        currentModalStageId = stageId;
+        currentModalTaskId = taskId;
+
+        const select = document.getElementById('part-select');
+        select.innerHTML = '<option value="">Загрузка каталога...</option>';
+        document.getElementById('part-quantity').value = 1; // Сброс количества
+
+        // Открываем окно
+        document.getElementById('part-modal').setAttribute('open', 'true');
+
+        try {
+            // Дергаем справочник запчастей
+            const response = await fetchWithAuth(`${API_BASE}/catalogs/parts`);
+            const parts = await response.json();
+
+            select.innerHTML = '<option value="" disabled selected>Выберите деталь</option>';
+            parts.forEach(p => {
+                // Показываем деталь и ее остаток на складе
+                select.innerHTML += `<option value="${p.id}">${p.nomenclature} (На складе: ${p.stock_quantity} шт.)</option>`;
+            });
+        } catch (e) {
+            select.innerHTML = '<option value="">Ошибка загрузки каталога</option>';
+        }
+    }
+
+    function closePartModal() {
+        document.getElementById('part-modal').removeAttribute('open');
+    }
+
+    async function assignPart() {
+        const partId = document.getElementById('part-select').value;
+        const quantity = document.getElementById('part-quantity').value;
+
+        if (!partId) {
+            alert("Пожалуйста, выберите деталь из списка.");
+            return;
+        }
+
+        try {
+            // Дергаем роутер списания детали
+            const response = await fetchWithAuth(`${API_BASE}/repair-stages/${currentModalStageId}/assign-part/${partId}?quantity=${quantity}`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                alert("Ошибка списания: " + err.detail);
+                return;
+            }
+
+            // Успех!
+            closePartModal();
+            // Перезагружаем этапы, чтобы списанная деталь отобразилась под названием этапа
+            await loadStages(currentModalTaskId);
+
+        } catch (e) {
+            alert("Ошибка соединения с сервером");
+        }
+    }
+</script>
+{% endblock %}

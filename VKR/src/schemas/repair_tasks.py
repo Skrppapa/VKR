@@ -18,6 +18,7 @@ class TaskStatusPatch(BaseModel):
 class RepairTaskResponse(RepairTaskBase):
     id: int
     rolling_stock_id: int
+    train_series: str
     brigade_id: Optional[int] = None
     master_name_snapshot: Optional[str] = "Не указан"  # Для старых записей
     status: TaskStatusEnum
@@ -37,4 +38,4 @@ class RepairTaskResponse(RepairTaskBase):
 
 # Расширенный ответ (например, когда запрашивают конкретное задание по ID)
 class RepairTaskWithStagesResponse(RepairTaskResponse):
-    stages: List[RepairStageResponse] = [] # Подтянет вложенные этапы
+    stages: List[RepairStageResponse] = []

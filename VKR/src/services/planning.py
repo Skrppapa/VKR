@@ -8,16 +8,13 @@ class PlanningService:
         self.db = db
 
     async def get_train_planning_status(self, train_id: int):
-        """Вычисление статусов по всем видам ремонта для конкретного поезда"""
+        """Вычисление статусов по всем видам ремонта для конкретного МВПС"""
 
-        # Получаем поезд
+        # Получаем МВПС
         train = await self.db.trains.get_by_id(train_id)
 
         if not train:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="МВПС не найден"
-            )
+            raise HTTPException(404, "МВПС не найден")
 
         # Получаем все регламенты для этой серии
         regulations = await self.db.regulations.get_all_by_series(train.series)
@@ -26,14 +23,13 @@ class PlanningService:
         now = datetime.now(timezone.utc)
 
         for reg in regulations:
-            # Ищем последнюю завершенную задачу через репозиторий
             last_repair_date = await self.db.tasks.get_last_completed_date(
                 train_id=train.id,
                 repair_type=reg.repair_type
             )
 
             if not last_repair_date:
-                # Если ремонта еще не было, считаем от даты выпуска поезда
+                # Если ремонта еще не было, считаем от даты выпуска МВПС
                 base_date = datetime.combine(train.manufacture_date, datetime.min.time()).replace(tzinfo=timezone.utc)
             else:
                 base_date = last_repair_date

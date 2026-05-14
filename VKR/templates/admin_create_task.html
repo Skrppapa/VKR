@@ -1,0 +1,70 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+<div class="container-xl">
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">Назначение нового ремонта</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="row row-cards">
+            <div class="col-md-6 col-lg-5">
+                <form action="/admin/create-task" method="POST" class="card">
+                    <div class="card-body">
+
+                        <!-- Блок вывода ошибок -->
+                        {% if error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ error }}
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label required">МВПС (Подвижной состав)</label>
+                            <select class="form-select" name="rolling_stock_id" required>
+                                <option value="" disabled selected>Выберите поезд...</option>
+                                {% for train in trains %}
+                                    <option value="{{ train.id }}">{{ train.series }} (№{{ train.inventory_number }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required">Вид ремонта</label>
+                            <select class="form-select" name="repair_type" required>
+                                <option value="" disabled selected>Выберите вид...</option>
+                                <option value="ТО-1">ТО-1</option>
+                                <option value="ТО-2">ТО-2</option>
+                                <option value="ТО-3">ТО-3</option>
+                                <option value="ТР-1">ТР-1</option>
+                                <option value="ТР-2">ТР-2</option>
+                                <option value="ТР-3">ТР-3</option>
+                                <option value="КР-1">КР-1</option>
+                                <option value="КР-2">КР-2</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label required">Исполнитель (Бригада)</label>
+                            <select class="form-select" name="brigade_id" required>
+                                <option value="" disabled selected>Назначить бригаду...</option>
+                                {% for brigade in brigades %}
+                                    <option value="{{ brigade.id }}">{{ brigade.name }} (Мастер: {{ brigade.master_name or 'Нет' }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                    </div>
+                    <div class="card-footer text-end">
+                        <button type="submit" class="btn btn-primary">Сформировать задание</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

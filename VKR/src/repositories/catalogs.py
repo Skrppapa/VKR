@@ -1,4 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from typing import Optional, List
 from src.models import RegulationStageTemplate, StagePart
 from src.repositories.base import BaseRepository
 from src.models.parts_and_materials import PartAndMaterial
@@ -7,9 +10,7 @@ from src.models.work_brigades import WorkBrigade
 from src.schemas.parts_and_materials import PartAndMaterialCreate, PartAndMaterialUpdate
 from src.schemas.regulations import RegulationCreate, RegulationUpdate
 from src.schemas.work_brigades import WorkBrigadeCreate, WorkBrigadeUpdate
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from typing import Optional, List
+
 
 
 class PartRepository(BaseRepository[PartAndMaterial, PartAndMaterialCreate, PartAndMaterialUpdate]):
@@ -17,11 +18,9 @@ class PartRepository(BaseRepository[PartAndMaterial, PartAndMaterialCreate, Part
         super().__init__(PartAndMaterial, session)
 
     async def use_part(self, part: PartAndMaterial, quantity: int, stage_id: int):
-        # Уменьшаем кол-во
         part.stock_quantity -= quantity
         self.session.add(part)
 
-        # Создаем запись об использовании
         stage_part = StagePart(stage_id=stage_id, part_id=part.id, quantity_used=quantity)
         self.session.add(stage_part)
 
@@ -36,27 +35,24 @@ class RegulationRepository(BaseRepository[Regulation, RegulationCreate, Regulati
         super().__init__(Regulation, session)
 
     async def get_by_type_and_series(self, repair_type: str, train_series: str) -> Optional[Regulation]:
-        """метод для проверки дубликатов и вытаскивания регламента с шаблонами"""
         query = (
             select(self.model)
             .where(
                 self.model.repair_type == repair_type,
                 self.model.train_series == train_series
             )
-            .options(selectinload(self.model.templates)) # <--- ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТО
+            .options(selectinload(self.model.templates))
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def create(self, obj_in: RegulationCreate) -> Regulation:
-        """Переопределенный create для работы с вложенными шаблонами"""
+        """create для работы с вложенными шаблонами"""
         data_dict = obj_in.model_dump()
         templates_data = data_dict.pop("templates", [])
 
-        # Создаем родительский объект
         new_reg = self.model(**data_dict)
 
-        # Создаем и привязываем дочерние объекты
         for t_data in templates_data:
             new_reg.templates.append(RegulationStageTemplate(**t_data))
 

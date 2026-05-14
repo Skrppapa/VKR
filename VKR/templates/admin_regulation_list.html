@@ -1,0 +1,35 @@
+{% extends "sqladmin/list.html" %}
+
+{% block content %}
+    {{ super() }}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // 1. Создаем саму кнопку с классами Bootstrap
+            const createBtn = document.createElement('a');
+            createBtn.href = '/admin/create-regulation';
+            createBtn.className = 'btn btn-primary me-2'; // me-2 задает красивый отступ справа
+            createBtn.innerHTML = '<i class="fa-solid fa-plus" style="margin-right: 5px;"></i>Новый регламент';
+
+            // 2. Ищем элемент "Export". На твоем скриншоте видно стрелочку вниз - значит это dropdown
+            const dropdowns = document.querySelectorAll('.dropdown');
+            let exportDropdown = null;
+
+            dropdowns.forEach(function(dropdown) {
+                if (dropdown.textContent.includes('Export')) {
+                    exportDropdown = dropdown;
+                }
+            });
+
+            // 3. Аккуратно вставляем нашу кнопку прямо перед кнопкой Export
+            if (exportDropdown && exportDropdown.parentNode) {
+                // parentNode - это контейнер кнопок (обычно .btn-list)
+                exportDropdown.parentNode.insertBefore(createBtn, exportDropdown);
+
+                // Фикс стилей для контейнера, чтобы кнопки выровнялись по центру
+                exportDropdown.parentNode.style.display = 'flex';
+                exportDropdown.parentNode.style.alignItems = 'center';
+            }
+        });
+    </script>
+{% endblock %}

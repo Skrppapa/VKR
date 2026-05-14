@@ -1,22 +1,27 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
-from typing import Optional, List
+from typing import Optional
+from src.models.enums import TaskStatusEnum
+from datetime import datetime
 from src.repositories.base import BaseRepository
 from src.models.repair_tasks import RepairTask
 from src.models.repair_stages import RepairStage
 from src.models.stage_parts import StagePart
 from src.schemas.repair_tasks import RepairTaskCreate, TaskStatusPatch
-from src.models.enums import TaskStatusEnum
-from datetime import datetime
+
 
 class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStatusPatch]):
     def __init__(self, session: AsyncSession):
         super().__init__(RepairTask, session)
 
-    async def get_active_tasks(self) -> List[RepairTask]:
+    async def get_active_tasks(self) -> list[RepairTask]:
         """Получить все активные задания"""
-        query = select(self.model).where(self.model.status != TaskStatusEnum.COMPLETED)
+        query = (
+            select(self.model)
+            .where(self.model.status != TaskStatusEnum.COMPLETED)
+            .options(selectinload(self.model.rolling_stock))
+        )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -26,6 +31,8 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
             select(self.model)
             .where(self.model.id == task_id)
             .options(
+                selectinload(self.model.rolling_stock),
+                selectinload(self.model.brigade),
                 selectinload(self.model.stages).selectinload(RepairStage.brigades),
                 selectinload(self.model.stages).selectinload(RepairStage.part_associations).selectinload(StagePart.part)
             )
@@ -34,7 +41,7 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         return result.scalar_one_or_none()
 
     async def get_with_stages(self, task_id: int) -> Optional[RepairTask]:
-        """Достать задание только с его этапами - для статусов"""
+        """Достать задание только с его этапами"""
         query = (
             select(self.model)
             .where(self.model.id == task_id)
@@ -43,7 +50,7 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_archived_tasks(self, skip: int = 0, limit: int = 100) -> List[RepairTask]:
+    async def get_archived_tasks(self, skip: int = 0, limit: int = 100) -> list[RepairTask]:
         """Получить завершенные задания (Архив)"""
         query = select(self.model).where(
             self.model.status == TaskStatusEnum.COMPLETED

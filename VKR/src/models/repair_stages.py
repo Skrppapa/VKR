@@ -29,7 +29,7 @@ class RepairStage(Base):
     # Таймер и паузы
     last_paused_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     total_paused_seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    pause_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True) # Обязательно при ручной паузе
+    pause_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     repair_task: Mapped["RepairTask"] = relationship(back_populates="stages")
     regulation: Mapped["Regulation"] = relationship(back_populates="stages")

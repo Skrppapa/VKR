@@ -13,5 +13,4 @@ class RollingStock(Base):
     series: Mapped[str] = mapped_column(String(50))
     manufacture_date: Mapped[date] = mapped_column(Date)
 
-    # Связь один-ко-многим: Один вагон имеет много ремонтных заданий
     repair_tasks: Mapped[list["RepairTask"]] = relationship(back_populates="rolling_stock")

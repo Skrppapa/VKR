@@ -33,9 +33,6 @@ async def get_task_graph(task_id: int, db: DBDep):
 
 @router.delete("/{task_id}", status_code=204)
 async def delete_task(task_id: int, db: DBDep):
-    """
-    Удалить можно только ошибочно созданное задание.
-    Активные и завершенные защищены на уровне сервиса.
-    """
+    """Удалить задание (Кроме активных и завершенных)"""
     service = RepairTaskService(db)
     await service.delete_task(task_id)

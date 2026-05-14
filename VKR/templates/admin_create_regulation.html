@@ -1,0 +1,117 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 800px;">
+    <h3 class="mb-4" style="font-weight: 500;">Создание нового регламента ремонта</h3>
+
+    {% if error %}
+    <div class="alert alert-danger" style="border-radius: 8px;">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm" style="border: none; border-radius: 12px;">
+        <div class="card-body p-4">
+            <form action="/admin/create-regulation" method="POST" id="regulationForm">
+
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small text-uppercase">Серия МВПС</label>
+                        <select name="train_series" class="form-select form-select-sm" required style="border-radius: 6px;">
+                            <option value="" disabled selected>Выберите серию</option>
+                            {% for series in train_series %}
+                                <option value="{{ series }}">{{ series }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small text-uppercase">Вид ремонта</label>
+                        <select name="repair_type" class="form-select form-select-sm" required style="border-radius: 6px;">
+                            <option value="" disabled selected>Выберите вид</option>
+                            {% for r_type in repair_types %}
+                                <option value="{{ r_type }}">{{ r_type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small text-uppercase">Норма времени (часы)</label>
+                        <input type="number" name="standard_hours" class="form-control form-control-sm" required min="1" style="border-radius: 6px;">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small text-uppercase">Периодичность (дни)</label>
+                        <input type="number" name="frequency_days" class="form-control form-control-sm" required min="0" style="border-radius: 6px;">
+                    </div>
+                </div>
+
+                <hr class="mb-4" style="opacity: 0.1;">
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="m-0" style="font-weight: 500;">Этапы ремонта</h5>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addStage()" style="border-radius: 6px;">
+                            <i class="fa-solid fa-plus"></i> Добавить этап
+                        </button>
+                    </div>
+
+                    <div id="stagesContainer">
+                        </div>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <a href="/admin/dashboard" class="btn btn-light me-2" style="border-radius: 6px;">Отмена</a>
+                    <button type="submit" class="btn btn-dark" style="border-radius: 6px;">Сохранить регламент</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    let stageCounter = 0;
+
+    function addStage() {
+        stageCounter++;
+        const container = document.getElementById('stagesContainer');
+
+        const stageDiv = document.createElement('div');
+        stageDiv.className = 'd-flex mb-2 align-items-center stage-item';
+        stageDiv.id = `stage_${stageCounter}`;
+
+        stageDiv.innerHTML = `
+            <div class="bg-light text-muted px-3 py-2 me-2" style="border-radius: 6px; font-size: 0.85rem;">
+                <span class="stage-number"></span>
+            </div>
+            <input type="text" name="template_name_${stageCounter}" class="form-control form-control-sm me-2" placeholder="Название этапа (например, Диагностика оборудования)" required style="border-radius: 6px;">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeStage(${stageCounter})" style="border-radius: 6px;">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        `;
+
+        container.appendChild(stageDiv);
+        updateStageNumbers();
+    }
+
+    function removeStage(id) {
+        const stageDiv = document.getElementById(`stage_${id}`);
+        if (stageDiv) {
+            stageDiv.remove();
+            updateStageNumbers();
+        }
+    }
+
+    function updateStageNumbers() {
+        const stages = document.querySelectorAll('.stage-item');
+        stages.forEach((stage, index) => {
+            stage.querySelector('.stage-number').textContent = index + 1;
+        });
+    }
+
+    // Инициализируем один пустой этап при загрузке страницы
+    document.addEventListener("DOMContentLoaded", () => {
+        addStage();
+    });
+</script>
+{% endblock %}

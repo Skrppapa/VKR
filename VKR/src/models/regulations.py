@@ -13,12 +13,8 @@ class Regulation(Base):
     train_series: Mapped[str] = mapped_column(String(50), nullable=False)
     standard_hours: Mapped[int] = mapped_column(Integer, nullable=False)
     frequency_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-
     stages: Mapped[list["RepairStage"]] = relationship(back_populates="regulation")
-    templates: Mapped[list["RegulationStageTemplate"]] = relationship(
-        back_populates="regulation",
-        cascade="all, delete-orphan"
-    )
+    templates: Mapped[list["RegulationStageTemplate"]] = relationship(back_populates="regulation", cascade="all, delete-orphan")
 
     # Уникальность из двух столбцов Тип ремонта (repair_type) и Модель поезда (train_series)
     __table_args__ = (

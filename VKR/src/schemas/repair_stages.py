@@ -12,7 +12,6 @@ class PartShortResponse(BaseModel):
 
 
 class StagePartResponse(BaseModel):
-    # part_id
     quantity_used: int
     part: PartShortResponse
 

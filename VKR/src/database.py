@@ -9,7 +9,6 @@ async_session_maker = async_sessionmaker(bind=engine, expire_on_commit=False)
 
 int_pk = Annotated[int, mapped_column(primary_key=True, autoincrement=True)]
 
-
-class Base(DeclarativeBase):  # Содержит в себе все данные о всех моделях (столбцы, ограничения, ключи и т.д.)
+class Base(DeclarativeBase):
     pass
 

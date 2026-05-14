@@ -7,18 +7,18 @@ from src.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Проверяет, совпадает ли введенный пароль с хешем из БД"""
+def verify_password(plain_password: str, hashed_password: str):
+    """Проверка введенного пароля с хешем"""
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password: str) -> str:
-    """Превращает пароль в нечитаемый хеш"""
+def get_password_hash(password: str):
+    """Перевод пароля в хэш"""
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict) -> str:
-    """Создает JWT токен с временем жизни"""
+def create_access_token(data: dict):
+    """Создание JWT токена"""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -28,19 +28,17 @@ def create_access_token(data: dict) -> str:
 
 
 # Защита swagger
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    """Зависимость, которая проверяет токен из заголовка запроса."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Не удалось подтвердить учетные данные",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Расшифровываем токен нашим секретным ключом
+        # Расшифровка токена секретным ключом
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         username: str = payload.get("sub")
         if username is None:

@@ -8,6 +8,6 @@ class RegulationStageTemplate(Base):
     id: Mapped[int_pk]
     regulation_id: Mapped[int] = mapped_column(ForeignKey("regulations.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    order_number: Mapped[int] = mapped_column(Integer, nullable=False) # Порядок выполнения
+    order_number: Mapped[int] = mapped_column(Integer, nullable=False) # Порядок выполнения этапа
 
     regulation: Mapped["Regulation"] = relationship(back_populates="templates")

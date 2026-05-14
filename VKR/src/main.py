@@ -9,15 +9,22 @@ from src.api.catalogs import router as catalogs_router
 from src.api.repair_task import router as repair_task_router
 from src.api.repair_stage import router as repair_stage_router
 from src.api.auth import router as auth
+from src.api.pages import router as pages
 from src.security import get_current_user
 
 
 
 from sqladmin import Admin
 from src.database import engine
-from src.sql_admin.admin import DashboardView
 from src.sql_admin.admin_auth import AdminAuth
-from src.sql_admin.admin import (RollingStockAdmin, RegulationAdmin, PartAndMaterialAdmin, WorkBrigadeAdmin, RepairTaskAdmin, RepairStageAdmin)
+from src.sql_admin.admin import (RollingStockAdmin,
+                                 RegulationAdmin,
+                                 PartAndMaterialAdmin,
+                                 WorkBrigadeAdmin,
+                                 RepairTaskAdmin,
+                                 DashboardView,
+                                 CreateTaskAdminView,
+                                 CreateRegulationAdminView)
 
 
 app = FastAPI(
@@ -45,12 +52,14 @@ admin = Admin(
 
 
 admin.add_view(DashboardView)
+admin.add_view(CreateRegulationAdminView)
+admin.add_view(CreateTaskAdminView)
 admin.add_view(RollingStockAdmin)
 admin.add_view(RegulationAdmin)
 admin.add_view(PartAndMaterialAdmin)
 admin.add_view(WorkBrigadeAdmin)
 admin.add_view(RepairTaskAdmin)
-admin.add_view(RepairStageAdmin)
+
 
 
 app.include_router(auth, prefix="/api/v1")
@@ -58,6 +67,7 @@ app.include_router(rolling_stock_router, prefix="/api/v1", dependencies=[Depends
 app.include_router(catalogs_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 app.include_router(repair_task_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
 app.include_router(repair_stage_router, prefix="/api/v1", dependencies=[Depends(get_current_user)])
+app.include_router(pages)
 
 
 if __name__ == "__main__":

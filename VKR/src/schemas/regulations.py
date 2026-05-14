@@ -7,10 +7,8 @@ class RegulationTemplateBase(BaseModel):
     name: str = Field(..., description="Название этапа (например, Диагностика)")
     order_number: int = Field(..., gt=0, description="Порядковый номер выполнения")
 
-
 class RegulationTemplateCreate(RegulationTemplateBase):
     pass
-
 
 class RegulationTemplateResponse(RegulationTemplateBase):
     id: int
@@ -32,8 +30,8 @@ class RegulationCreate(RegulationBase):
     @field_validator("templates")
     @classmethod
     def validate_order_numbers(cls, templates: List[RegulationTemplateCreate]):
-        orders = sorted([t.order_number for t in templates])  # Собираем все переданные order_number и сортируем
-        expected_orders = list(range(1, len(templates) + 1))  # Генерируем последовательность от 1 до N (где N - количество этапов)
+        orders = sorted([t.order_number for t in templates])
+        expected_orders = list(range(1, len(templates) + 1))
 
         if orders != expected_orders:
             raise ValueError(

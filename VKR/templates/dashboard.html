@@ -13,7 +13,8 @@
     <div class="page-body">
 
         <div class="row row-cards mb-4">
-            <div class="col-sm-4">
+
+            <div class="col-sm-3">
                 <div class="card card-sm">
                     <div class="card-body">
                         <div class="row align-items-center">
@@ -26,7 +27,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-sm-4">
+
+            <div class="col-sm-3">
                 <div class="card card-sm">
                     <div class="card-body">
                         <div class="row align-items-center">
@@ -39,7 +41,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-sm-4">
+
+            <div class="col-sm-3">
                 <div class="card card-sm">
                     <div class="card-body">
                         <div class="row align-items-center">
@@ -52,6 +55,25 @@
                     </div>
                 </div>
             </div>
+
+            <div class="col-sm-3">
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span class="bg-danger text-white avatar">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </span>
+                            </div>
+                            <div class="col">
+                                <div class="font-weight-medium">Нарушение сроков</div>
+                                <div class="text-muted">{{ overdue_stages_count }} этапов</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <div class="row row-cards">
@@ -71,13 +93,15 @@
                                         {% endif %}
                                     </div>
                                     <div class="col text-truncate">
-                                        <span class="text-body d-block">Поезд {{ item.task.rolling_stock.series }} (№{{ item.task.rolling_stock.inventory_number }})</span>
+                                        <a href="/admin/dashboard/task/{{ item.task.id }}" class="text-body d-block text-decoration-none" style="font-weight: 600;">
+                                            Поезд {{ item.task.rolling_stock.series }} (№{{ item.task.rolling_stock.inventory_number }})
+                                        </a>
                                         <small class="d-block text-muted text-truncate mt-n1">
                                             Вид: {{ item.task.repair_type.value }}
                                         </small>
                                     </div>
                                     <div class="col-auto">
-                                        {% if item.is_overdue %}
+                                        {% if item.is_task_overdue %}
                                             <span class="badge bg-danger" title="Время по нормативу вышло!">Просрочено</span>
                                         {% endif %}
                                     </div>
