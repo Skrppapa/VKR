@@ -14,3 +14,6 @@ class RollingStock(Base):
     manufacture_date: Mapped[date] = mapped_column(Date)
 
     repair_tasks: Mapped[list["RepairTask"]] = relationship(back_populates="rolling_stock")
+
+    def __str__(self):
+        return f"{self.series} (№{self.inventory_number})"

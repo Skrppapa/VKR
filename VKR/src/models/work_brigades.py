@@ -15,3 +15,6 @@ class WorkBrigade(Base):
 
     stages: Mapped[list["RepairStage"]] = relationship(secondary=stage_brigade_association, back_populates="brigades")
     repair_tasks: Mapped[list["RepairTask"]] = relationship(back_populates="brigade")
+
+    def __str__(self):
+        return self.name

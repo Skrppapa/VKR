@@ -5,10 +5,9 @@
         document.addEventListener("DOMContentLoaded", function() {
             // 1. Создаем кнопку
             const createBtn = document.createElement('a');
-            createBtn.href = '/admin/create-regulation';
-            // Делаем её стандартного размера, как остальные кнопки интерфейса
+            createBtn.href = '/admin/create-task';
             createBtn.className = 'btn btn-primary';
-            createBtn.innerHTML = '<i class="fa-solid fa-plus" style="margin-right: 5px;"></i> Добавить Регламент';
+            createBtn.innerHTML = '<i class="fa-solid fa-plus" style="margin-right: 5px;"></i> Новое задание';
 
             // 2. Ищем заголовок таблицы (шапку)
             const cardHeader = document.querySelector('.card-header');
@@ -17,7 +16,7 @@
                 // Включаем Flexbox для раскидывания элементов по краям
                 cardHeader.classList.add('d-flex', 'justify-content-between', 'align-items-center');
 
-                // Убираем нижний отступ у самого текста "Регламенты", чтобы он стоял по центру относительно кнопки
+                // Убираем нижний отступ у самого текста "Ремонтные задания"
                 const title = cardHeader.querySelector('.card-title');
                 if (title) title.classList.add('mb-0');
 

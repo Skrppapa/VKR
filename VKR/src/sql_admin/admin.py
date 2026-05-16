@@ -1,16 +1,15 @@
 from datetime import datetime, timezone
+from typing import Any
 from urllib.request import Request
+from pydantic import ValidationError
 from sqladmin import ModelView, BaseView, expose
 from src.utils.db_manager import DBManager
 import json
 from sqlalchemy import select
 from src.database import async_session_maker
 from src.services.planning import PlanningService
-from src.models import (
-    RollingStock, Regulation, PartAndMaterial,
-    WorkBrigade, RepairTask, RepairStage
-)
-from fastapi import Request
+from src.models import (RollingStock, Regulation, PartAndMaterial, WorkBrigade, RepairTask, RepairStage)
+from fastapi import Request, HTTPException, status
 from sqlalchemy.orm import selectinload
 from src.models.enums import TaskStatusEnum
 from fastapi.responses import RedirectResponse
@@ -19,10 +18,41 @@ from src.services.repair_tasks import RepairTaskService
 from src.models.enums import RepairTypeEnum
 from src.schemas.regulations import RegulationCreate, RegulationTemplateCreate
 from src.services.catalogs import RegulationService
+from src.services.catalogs import BrigadeService
+from src.schemas.work_brigades import WorkBrigadeCreate, WorkBrigadeUpdate
 
 
-class RollingStockAdmin(ModelView, model=RollingStock):
-    column_list = [RollingStock.id, RollingStock.inventory_number, RollingStock.series, RollingStock.manufacture_date]
+
+class BaseModelView(ModelView):
+    """Базовый класс, который подтягивает русификацию для всех таблиц"""
+    list_template = "custom_list.html"
+    create_template = "custom_create.html"
+    edit_template = "custom_edit.html"
+    details_template = "custom_details.html"
+
+    can_export = False
+
+
+class RollingStockAdmin(BaseModelView, model=RollingStock):
+
+    _shared_columns = [
+        RollingStock.id,
+        RollingStock.inventory_number,
+        RollingStock.series,
+        RollingStock.manufacture_date
+    ]
+
+    column_labels = {
+        "id": "ID",
+        "inventory_number": "Инвентарный номер",
+        "series": "Серия МВПС",
+        "manufacture_date": "Дата выпуска"
+    }
+
+    column_list = _shared_columns
+    column_details_list = _shared_columns
+
+
     name = "Поезд (МВПС)"
     name_plural = "Поезда (МВПС)"
     icon = "fa-solid fa-train"
@@ -30,14 +60,33 @@ class RollingStockAdmin(ModelView, model=RollingStock):
     form_excluded_columns = ["repair_tasks"]
 
 
-class RegulationAdmin(ModelView, model=Regulation):
-    column_list = [Regulation.id, Regulation.repair_type, Regulation.train_series, Regulation.standard_hours,
-                   Regulation.frequency_days]
+class RegulationAdmin(BaseModelView, model=Regulation):
+
+    _shared_columns = [
+        Regulation.id,
+        Regulation.repair_type,
+        Regulation.train_series,
+        Regulation.standard_hours,
+        Regulation.frequency_days
+    ]
+
+    column_labels = {
+        "id": "ID",
+        "repair_type": "Вид ремонта",
+        "train_series": "Серия поезда",
+        "standard_hours": "Норма времени (ч)",
+        "frequency_days": "Периодичность (дни)"
+    }
+
+    column_list = _shared_columns
+    column_details_list = _shared_columns
+
     name = "Регламент"
     name_plural = "Регламенты"
     icon = "fa-solid fa-book"
     can_create = False
     list_template = "admin_regulation_list.html"
+    column_searchable_list = [Regulation.train_series]
     form_excluded_columns = ["stages", "templates"]
 
 
@@ -114,32 +163,194 @@ class CreateRegulationAdminView(BaseView):
             error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
             return RedirectResponse(url=f"/admin/create-regulation?error={error_msg}", status_code=303)
 
-class PartAndMaterialAdmin(ModelView, model=PartAndMaterial):
-    column_list = [PartAndMaterial.id, PartAndMaterial.nomenclature, PartAndMaterial.stock_quantity]
+class PartAndMaterialAdmin(BaseModelView, model=PartAndMaterial):
+
+    _shared_columns = [
+        PartAndMaterial.id,
+        PartAndMaterial.nomenclature,
+        PartAndMaterial.stock_quantity
+    ]
+
+    column_labels = {
+        "id": "ID",
+        "nomenclature": "Номенклатура",
+        "stock_quantity": "Остаток на складе"
+    }
+
+    column_list = _shared_columns
+    column_details_list = _shared_columns
+
     name = "Запчасть"
     name_plural = "Склад запчастей"
     icon = "fa-solid fa-box"
     column_searchable_list = [PartAndMaterial.nomenclature]
     form_excluded_columns = ["stage_associations"]
 
-class WorkBrigadeAdmin(ModelView, model=WorkBrigade):
-    column_list = [WorkBrigade.id, WorkBrigade.name]
-    name = "Бригада"
+
+class WorkBrigadeAdmin(BaseModelView, model=WorkBrigade):
+
+    _shared_columns = [
+        WorkBrigade.id,
+        WorkBrigade.name,
+        WorkBrigade.master_name,
+        WorkBrigade.master_id_number
+    ]
+
+    column_labels = {
+        "id": "ID",
+        "name": "Название бригады",
+        "master_name": "ФИО Мастера",
+        "master_id_number": "Табельный номер"
+    }
+
+    column_list = _shared_columns
+    column_details_list = _shared_columns
+
+    name = "Бригаду"
     name_plural = "Рабочие бригады"
     icon = "fa-solid fa-users"
+    column_searchable_list = [WorkBrigade.name, WorkBrigade.master_name]
     form_excluded_columns = [WorkBrigade.stages, WorkBrigade.repair_tasks]
 
-class RepairTaskAdmin(ModelView, model=RepairTask):
-    column_list = [RepairTask.id, RepairTask.rolling_stock_id, RepairTask.repair_type, RepairTask.status, RepairTask.planned_end_date]
+    async def insert_model(self, request: Request, data: dict) -> Any:
+        """Перехват создания новой бригады"""
+        async with DBManager(session_factory=async_session_maker) as db:
+            # Создаем сервис (инженера), передаем ему базу
+            service = BrigadeService(db)
+            try:
+                # ИСПОЛЬЗУЕМ СХЕМУ (фильтр) для проверки данных
+                # Тут должно быть имя Pydantic класса: WorkBrigadeCreate
+                create_schema = WorkBrigadeCreate(**data)
+
+                # Передаем УЖЕ ПРОВЕРЕННУЮ схему в сервис
+                return await service.create(create_schema)
+
+            except (ValidationError, ValueError, HTTPException) as e:
+                error_detail = e.errors()[0]['msg'] if hasattr(e, 'errors') else str(e)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Ошибка валидации: {error_detail}"
+                )
+
+    async def update_model(self, request: Request, data: dict, model: Any) -> Any:
+        """Перехват изменения существующей бригады"""
+        async with DBManager(session_factory=async_session_maker) as db:
+            service = BrigadeService(db)
+            try:
+                # ИСПОЛЬЗУЕМ СХЕМУ ОБНОВЛЕНИЯ: WorkBrigadeUpdate
+                update_schema = WorkBrigadeUpdate(**data)
+
+                return await service.update(model.id, update_schema)
+
+            except (ValidationError, ValueError, HTTPException) as e:
+                error_detail = e.errors()[0]['msg'] if hasattr(e, 'errors') else str(e)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Ошибка изменения: {error_detail}"
+                )
+
+
+TASK_STATUS_TRANSLATE = {
+    "CREATED": "Создано",
+    "IN_PROGRESS": "В работе",
+    "PAUSED": "Пауза",
+    "WAITING_PARTS": "Ожидание запчастей",
+    "COMPLETED": "Завершено"
+}
+
+
+class RepairTaskAdmin(BaseModelView, model=RepairTask):
+
+    list_template = "admin_task_list.html"
+
+    # Для общей таблицы
+    column_list = [
+        RepairTask.id,
+        RepairTask.rolling_stock,
+        RepairTask.repair_type,
+        RepairTask.brigade,
+        RepairTask.status,
+        RepairTask.start_date,
+        RepairTask.planned_end_date
+    ]
+
+    # Перевод названий колонок
+    column_labels = {
+        "id": "ID",
+        "rolling_stock": "Серия МВПС",
+        "repair_type": "Вид ремонта",
+        "brigade": "Бригада",
+        "status": "Статус ремонта",
+        "start_date": "Дата начала",
+        "baseline_end_date": "Базовый план (по регламенту)",
+        "planned_end_date": "Текущий план (с учетом пауз)",
+        "master_name_snapshot": "ФИО Мастера",
+        "actual_end_date": "Фактическое окончание",
+        "formatted_paused_time": "Суммарное время пауз"
+    }
+
+    # Форматирование дат и статусов
+
+    _shared_formatters = {
+        RepairTask.status: lambda m, a: TASK_STATUS_TRANSLATE.get(
+            m.status.name if hasattr(m.status, 'name') else str(m.status),
+            str(m.status)
+        ),
+        RepairTask.start_date: lambda m, a: m.start_date.strftime("%d.%m.%Y %H:%M") if getattr(m, 'start_date',
+                                                                                               None) else "—",
+
+        # Передаем вычисляемое свойство как СТРОКУ!
+        "baseline_end_date": lambda m, a: m.baseline_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m,
+                                                                                                    'baseline_end_date',
+                                                                                                    None) else "—",
+
+        RepairTask.planned_end_date: lambda m, a: m.planned_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m,
+                                                                                                           'planned_end_date',
+                                                                                                           None) else "—",
+        RepairTask.actual_end_date: lambda m, a: m.actual_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m,
+                                                                                                         'actual_end_date',
+                                                                                                         None) else "—",
+    }
+
+    column_formatters = _shared_formatters
+    column_formatters_detail = _shared_formatters
+
+    # Для детального просмотра
+    column_details_list = [
+        RepairTask.id,
+        RepairTask.rolling_stock,
+        RepairTask.repair_type,
+        RepairTask.brigade,
+        RepairTask.status,
+        RepairTask.start_date,
+
+        # Передаем вычисляемые свойства как СТРОКИ!
+        "baseline_end_date",
+        "formatted_paused_time",
+
+        RepairTask.planned_end_date,
+        RepairTask.actual_end_date
+    ]
+
     name = "Задание"
     name_plural = "Ремонтные задания"
     icon = "fa-solid fa-clipboard-list"
-    # Запрещаем создавать задания из админки (это делает только наше API с автогенерацией этапов)
+
     can_create = False
     can_edit = False
     can_delete = True
 
-class RepairStageAdmin(ModelView, model=RepairStage):
+    async def delete_model(self, request: Request, pk: Any) -> None:
+        async with DBManager(session_factory=async_session_maker) as db:
+            service = RepairTaskService(db)
+            try:
+                await service.delete_task(int(pk))
+            except HTTPException as e:
+                raise HTTPException(status_code=e.status_code, detail=e.detail)
+            except Exception as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+class RepairStageAdmin(BaseModelView, model=RepairStage):
     column_list = [RepairStage.id, RepairStage.repair_task_id, RepairStage.name, RepairStage.status]
     name = "Этап ремонта"
     name_plural = "Этапы ремонта"
@@ -152,8 +363,6 @@ class RepairStageAdmin(ModelView, model=RepairStage):
 class DashboardView(BaseView):
     name = "Дашборд"
     icon = "fa-solid fa-chart-pie"
-
-
 
     @expose("/dashboard", methods=["GET"])
     async def dashboard(self, request: Request):
@@ -259,6 +468,9 @@ class CreateTaskAdminView(BaseView):
     name = "Создать задание"
     icon = "fa-solid fa-plus-circle"
 
+    def is_visible(self, request: Request) -> bool:
+        return False
+
     @expose("/create-task", methods=["GET"])
     async def create_task_page(self, request: Request):
         async with DBManager(session_factory=async_session_maker) as db:
@@ -304,3 +516,33 @@ class CreateTaskAdminView(BaseView):
             # Если ошибка (например, нет регламента) - возвращаем обратно с текстом ошибки
             error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
             return RedirectResponse(url=f"/admin/create-task?error={error_msg}", status_code=303)
+
+
+class ArchiveView(BaseView):
+    name = "Архив ремонтов"
+    icon = "fa-solid fa-box-archive"
+
+    @expose("/archive", methods=["GET"])
+    async def archive_page(self, request: Request):
+        async with DBManager(session_factory=async_session_maker) as db:
+            # Вытягиваем только завершенные ремонты, подгружая связанные сущности
+            query = (
+                select(RepairTask)
+                .where(RepairTask.status == TaskStatusEnum.COMPLETED)
+                .options(
+                    selectinload(RepairTask.rolling_stock),
+                    selectinload(RepairTask.brigade)
+                )
+                .order_by(RepairTask.planned_end_date.desc())  # Свежие архивы сверху
+            )
+
+            completed_tasks = (await db.session.execute(query)).scalars().all()
+
+            return await self.templates.TemplateResponse(
+                request,
+                "admin_archive.html",
+                context={
+                    "request": request,
+                    "tasks": completed_tasks
+                }
+            )

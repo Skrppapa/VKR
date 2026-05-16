@@ -23,8 +23,39 @@ class RepairTask(Base):
 
     rolling_stock: Mapped["RollingStock"] = relationship(back_populates="repair_tasks")
     brigade: Mapped[Optional["WorkBrigade"]] = relationship(back_populates="repair_tasks")
-    stages: Mapped[list["RepairStage"]] = relationship(back_populates="repair_task", cascade="all, delete-orphan")
+    stages: Mapped[list["RepairStage"]] = relationship(
+        back_populates="repair_task",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
 
     @property
     def train_series(self) -> str:
         return self.rolling_stock.series if self.rolling_stock else "Неизвестно"
+
+    @property
+    def baseline_end_date(self):
+        """Вычисление времени окончания по регламенту"""
+        if not self.planned_end_date:
+            return None
+
+        # Если паузы есть, вычитаем их из текущего плана
+        pauses = self.total_paused_seconds or 0
+        return self.planned_end_date - datetime.timedelta(seconds=pauses)
+
+
+    @property
+    def formatted_paused_time(self) -> str:
+        """Переводит секунды в читаемый формат: X ч Y мин"""
+        if not self.total_paused_seconds:
+            return "0 ч 0 мин"
+
+        hours = self.total_paused_seconds // 3600
+        minutes = (self.total_paused_seconds % 3600) // 60
+
+        # Если пауза длилась меньше минуты
+        if hours == 0 and minutes == 0 and self.total_paused_seconds > 0:
+            return f"{self.total_paused_seconds} сек"
+
+        return f"{hours} ч {minutes} мин"

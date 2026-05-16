@@ -19,7 +19,7 @@ class RepairStage(Base):
     __tablename__ = "repair_stages"
 
     id: Mapped[int_pk]
-    repair_task_id: Mapped[int] = mapped_column(ForeignKey("repair_tasks.id"))
+    repair_task_id: Mapped[int] = mapped_column(ForeignKey("repair_tasks.id", ondelete="CASCADE"))
     regulation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("regulations.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(100))
     status: Mapped[StageStatusEnum] = mapped_column(Enum(StageStatusEnum), default=StageStatusEnum.PENDING)
@@ -39,3 +39,6 @@ class RepairStage(Base):
         back_populates="stage",
         cascade="all, delete-orphan"
     )
+
+    def __str__(self):
+        return self.name
