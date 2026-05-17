@@ -1,6 +1,6 @@
 import sys
 import uvicorn
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -11,8 +11,8 @@ from src.api.repair_stage import router as repair_stage_router
 from src.api.auth import router as auth
 from src.api.pages import router as pages
 from src.security import get_current_user
-
-
+from src.utils.logger import log
+import time
 
 from sqladmin import Admin
 from src.database import engine
@@ -33,6 +33,32 @@ app = FastAPI(
     description="API для планирования и контроля ремонта подвижного состава",
     version="1.0.0"
 )
+
+
+# Добавляем Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+
+    # 1. Логируем, что запрос пришел
+    client_ip = request.client.host if request.client else "Unknown"
+    log.info(f"Incoming request: {request.method} {request.url.path} from {client_ip}")
+
+    # 2. Передаем запрос дальше в твою программу
+    response = await call_next(request)
+
+    # 3. Высчитываем время выполнения и логируем результат
+    process_time = (time.time() - start_time) * 1000  # Переводим в миллисекунды
+
+    # Если ошибка 4xx или 5xx - пишем как WARNING или ERROR
+    if response.status_code >= 500:
+        log.error(f"Response: {response.status_code} | Time: {process_time:.2f}ms | Path: {request.url.path}")
+    elif response.status_code >= 400:
+        log.warning(f"Response: {response.status_code} | Time: {process_time:.2f}ms | Path: {request.url.path}")
+    else:
+        log.info(f"Response: {response.status_code} | Time: {process_time:.2f}ms | Path: {request.url.path}")
+
+    return response
 
 #===========Импорты==========
 import os

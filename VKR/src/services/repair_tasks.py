@@ -4,6 +4,7 @@ from src.schemas.repair_tasks import RepairTaskCreate
 from src.models.repair_tasks import RepairTask
 from src.models.enums import TaskStatusEnum, StageStatusEnum
 from src.utils.db_manager import DBManager
+from src.utils.logger import log
 
 
 class RepairTaskService:
@@ -69,15 +70,24 @@ class RepairTaskService:
 
     async def delete_task(self, task_id: int):
         """Удалить задание"""
+        log.info(f"Попытка удаления задания ID: {task_id}")
+
         task = await self.db.tasks.get_by_id(task_id)
         if not task:
+            log.warning(f"Задание ID: {task_id} не найдено для удаления")
             raise HTTPException(404, "Задание не найдено")
 
         if task.status in [TaskStatusEnum.IN_PROGRESS, TaskStatusEnum.COMPLETED]:
+            log.warning(
+                f"Отказ в удалении задания {task_id}. Текущий статус: {task.status.name if hasattr(task.status, 'name') else task.status}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Нельзя удалить задание, которое уже выполняется или завершено."
             )
+
+        await self.db.tasks.delete(task_id)
+        await self.db.commit()
+        log.info(f"Задание ID: {task_id} успешно удалено из БД")
 
         await self.db.tasks.delete(task_id)
         await self.db.commit()

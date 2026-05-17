@@ -346,9 +346,9 @@ class RepairTaskAdmin(BaseModelView, model=RepairTask):
             try:
                 await service.delete_task(int(pk))
             except HTTPException as e:
-                raise HTTPException(status_code=e.status_code, detail=e.detail)
+                raise Exception(e.detail)
             except Exception as e:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+                raise Exception(str(e))
 
 class RepairStageAdmin(BaseModelView, model=RepairStage):
     column_list = [RepairStage.id, RepairStage.repair_task_id, RepairStage.name, RepairStage.status]

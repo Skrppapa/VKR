@@ -99,8 +99,20 @@
             });
         }
 
+        // 6. ОЧИСТКА URL ОТ ФАНТОМНЫХ ОШИБОК
+        function cleanUrlParams() {
+            // Если в ссылке есть слово error
+            if (window.location.search.includes('error=')) {
+                // Собираем чистую ссылку без параметров
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                // Тихо подменяем ссылку в браузере, не перезагружая страницу
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
         // Запускаем все функции
-        autoHideAlerts(); // <-- ДОБАВИЛИ ВЫЗОВ
+        cleanUrlParams();
+        autoHideAlerts();
         translateInputs();
         translateTextNodes(document.body);
         translatePagination();
