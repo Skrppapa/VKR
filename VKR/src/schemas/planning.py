@@ -9,6 +9,7 @@ class PlanningItemResponse(BaseModel):
     days_remaining: int
     is_overdue: bool
 
+
     @field_serializer('last_repair_date', 'next_repair_date', check_fields=False)
     def format_dates(self, dt: Optional[datetime], _info) -> Optional[str]:
         if dt:

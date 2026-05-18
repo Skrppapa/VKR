@@ -59,3 +59,17 @@ class RepairTask(Base):
             return f"{self.total_paused_seconds} сек"
 
         return f"{hours} ч {minutes} мин"
+
+    @property
+    def overdue_hours(self) -> int:
+        """Вычисляет количество часов просрочки"""
+        if not self.planned_end_date:
+            return 0
+
+        # Сравниваем план с фактом завершения. Если еще в работе — с текущим временем
+        end_time = self.actual_end_date if self.actual_end_date else datetime.datetime.now(datetime.timezone.utc)
+        delta = end_time - self.planned_end_date
+
+        if delta.total_seconds() > 0:
+            return int(delta.total_seconds() / 3600)  # Возвращаем просрочку в часах
+        return 0

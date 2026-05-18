@@ -1,153 +1,213 @@
 {% extends "sqladmin/layout.html" %}
 
 {% block content %}
-<div class="container-xl">
-    <div class="page-header d-print-none">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">Аналитика и Управление ремонтом</h2>
+<div class="container-fluid mt-4" style="max-width: 1200px;">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 style="font-weight: 600; color: #2c3e50;">Сводка по депо</h3>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <a href="/admin/rolling-stock/list" class="text-decoration-none">
+                <div class="card shadow-sm border-0 h-100" style="border-radius: 12px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">МВПС в парке</p>
+                                <h3 class="mb-0 text-dark" style="font-weight: 700;">{{ total_trains }}</h3>
+                            </div>
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                <i class="fa-solid fa-train text-primary" style="font-size: 1.2rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-3">
+            <a href="/admin/dashboard/upcoming-repairs" class="text-decoration-none">
+                <div class="card shadow-sm border-0 h-100" style="border-radius: 12px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">План ремонтов (30 дн.)</p>
+                                <h3 class="mb-0 text-dark" style="font-weight: 700;">{{ planned_30_days_count }}</h3>
+                            </div>
+                            <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                <i class="fa-regular fa-calendar text-warning" style="font-size: 1.2rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">Заданий в работе</p>
+                            <h3 class="mb-0 text-dark" style="font-weight: 700;">{{ in_progress_count }}</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                            <i class="fa-solid fa-screwdriver-wrench text-success" style="font-size: 1.2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100 {% if overdue_tasks_count > 0 %}border-bottom border-danger border-3{% endif %}" style="border-radius: 12px;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">Просроченные задачи</p>
+                            <h3 class="mb-0 {% if overdue_tasks_count > 0 %}text-danger{% else %}text-dark{% endif %}" style="font-weight: 700;">{{ overdue_tasks_count }}</h3>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                            <i class="fa-solid fa-triangle-exclamation text-danger" style="font-size: 1.2rem;"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="page-body">
-
-        <div class="row row-cards mb-4">
-
-            <div class="col-sm-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto"><span class="bg-primary text-white avatar"><i class="fa-solid fa-train"></i></span></div>
-                            <div class="col">
-                                <div class="font-weight-medium">Всего МВПС в парке</div>
-                                <div class="text-muted">{{ total_trains }} ед.</div>
-                            </div>
-                        </div>
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <h5 style="font-weight: 600; color: #2c3e50; margin-bottom: 0;">Статусы активных заданий</h5>
+                </div>
+                <div class="card-body d-flex justify-content-center align-items-center">
+                    <div style="width: 80%; max-width: 250px;">
+                        <canvas id="statusChart"></canvas>
                     </div>
                 </div>
             </div>
-
-            <div class="col-sm-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto"><span class="bg-success text-white avatar"><i class="fa-solid fa-wrench"></i></span></div>
-                            <div class="col">
-                                <div class="font-weight-medium">В процессе ремонта</div>
-                                <div class="text-muted">{{ in_progress_count }} заданий</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto"><span class="bg-warning text-white avatar"><i class="fa-solid fa-pause"></i></span></div>
-                            <div class="col">
-                                <div class="font-weight-medium">На паузе / Ожидают деталей</div>
-                                <div class="text-muted">{{ paused_count }} заданий</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-danger text-white avatar">
-                                    <i class="fa-solid fa-triangle-exclamation"></i>
-                                </span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">Нарушение сроков</div>
-                                <div class="text-muted">{{ overdue_stages_count }} этапов</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
 
-        <div class="row row-cards">
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                    <h5 style="font-weight: 600; color: #2c3e50; margin-bottom: 0;">Контроль активных заданий</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="py-2 text-muted small text-uppercase">МВПС</th>
+                                    <th class="py-2 text-muted small text-uppercase">Вид ремонта</th>
+                                    <th class="py-2 text-muted small text-uppercase">Статус</th>
+                                    <th class="py-2 text-muted small text-uppercase">План окончания</th>
+                                    <th class="py-2 text-muted small text-uppercase">Просрочка</th>
+                                    <th class="py-2 text-muted small text-uppercase text-end">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set status_colors = {
+                                    'Создано': 'bg-secondary',
+                                    'В работе': 'bg-success',
+                                    'Пауза': 'bg-warning text-dark',
+                                    'Ожидание запчастей': 'bg-danger text-white'
+                                } %}
 
-            <div class="col-md-6">
-                <div class="card" style="height: 100%;">
-                    <div class="card-header"><h3 class="card-title">Текущие ремонты (Live)</h3></div>
-                    <div class="list-group list-group-flush list-group-hoverable">
-                        {% for item in active_tasks %}
-                            <div class="list-group-item">
-                                <div class="row align-items-center">
-                                    <div class="col-auto">
-                                        {% if item.task.status.value == 'В работе' %}
-                                            <span class="badge bg-success">В работе</span>
+                                {% for item in active_tasks %}
+                                <tr>
+                                    <td><strong>{{ item.task.rolling_stock.series }}</strong> <span class="text-muted small">(№{{ item.task.rolling_stock.inventory_number }})</span></td>
+                                    <td>{{ item.task.repair_type.value }}</td>
+                                    <td>
+                                        <span class="badge {{ status_colors.get(item.task.status.value, 'bg-light text-dark') }}" style="border-radius: 6px; font-weight: 500; padding: 5px 10px;">
+                                            {{ item.task.status.value }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if item.task.planned_end_date %}
+                                            <span class="{% if item.is_task_overdue %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                                {{ item.task.planned_end_date.strftime('%d.%m.%Y %H:%M') }}
+                                            </span>
                                         {% else %}
-                                            <span class="badge bg-warning">Пауза</span>
+                                            <span class="text-muted">—</span>
                                         {% endif %}
-                                    </div>
-                                    <div class="col text-truncate">
-                                        <a href="/admin/dashboard/task/{{ item.task.id }}" class="text-body d-block text-decoration-none" style="font-weight: 600;">
-                                            Поезд {{ item.task.rolling_stock.series }} (№{{ item.task.rolling_stock.inventory_number }})
-                                        </a>
-                                        <small class="d-block text-muted text-truncate mt-n1">
-                                            Вид: {{ item.task.repair_type.value }}
-                                        </small>
-                                    </div>
-                                    <div class="col-auto">
+                                    </td>
+                                    <td>
                                         {% if item.is_task_overdue %}
-                                            <span class="badge bg-danger" title="Время по нормативу вышло!">Просрочено</span>
+                                            <span class="badge bg-danger" style="border-radius: 4px; font-weight: 600; padding: 5px 12px; font-size: 0.75rem;">
+                                                ДА
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted small">Нет</span>
                                         {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        {% else %}
-                            <div class="list-group-item text-muted">Сейчас в цеху пусто.</div>
-                        {% endfor %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="/admin/dashboard/task/{{ item.task.id }}" class="btn btn-sm btn-outline-primary" style="border-radius: 6px;">Управление</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        В цеху нет активных ремонтных заданий
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-
-            <div class="col-md-6">
-                <div class="card" style="height: 100%;">
-                    <div class="card-header"><h3 class="card-title">Прогноз плановых ремонтов</h3></div>
-                    <div class="card-body">
-                        <canvas id="repairChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const chartData = {{ chart_data | safe }};
-    const ctx = document.getElementById('repairChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: chartData.labels,
-            datasets: [{
-                label: 'Дней до ближайшего ремонта (меньше 0 = просрочка)',
-                data: chartData.values,
-                backgroundColor: chartData.values.map(v => v < 0 ? '#e74c3c' : '#2ecc71'),
-                borderColor: '#333',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: false }
+    document.addEventListener("DOMContentLoaded", function () {
+        const rawData = '{{ chart_data | safe }}';
+        if (rawData && rawData !== '{}') {
+            const chartData = JSON.parse(rawData);
+
+            if (chartData.values.length > 0) {
+                const ctx = document.getElementById('statusChart').getContext('2d');
+
+                const colorMap = {
+                    "Создано": "#6c757d",
+                    "В работе": "#198754",
+                    "Пауза": "#ffc107",
+                    "Ожидание запчастей": "#dc3545"
+                };
+
+                const backgroundColors = chartData.labels.map(label => colorMap[label] || "#adb5bd");
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            data: chartData.values,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        cutout: '65%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } }
+                            }
+                        }
+                    }
+                });
+            } else {
+                const container = document.getElementById('statusChart').parentElement;
+                container.innerHTML = '<div class="text-muted text-center"><i class="fa-solid fa-mug-hot d-block mb-2 text-secondary" style="font-size: 2rem;"></i>Нет данных</div>';
             }
         }
     });

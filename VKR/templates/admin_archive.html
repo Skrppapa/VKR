@@ -2,47 +2,72 @@
 
 {% block content %}
 <div class="container-fluid mt-4" style="max-width: 1200px;">
-    <h3 class="mb-4" style="font-weight: 500;">
-        <i class="fa-solid fa-box-archive me-2 text-muted"></i>Архив завершенных ремонтов
-    </h3>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 style="font-weight: 600; color: #2c3e50;">
+            <i class="fa-solid fa-box-archive me-2"></i>Архив завершенных ремонтов
+        </h4>
+
+        <form method="GET" action="/admin/archive" class="d-flex">
+            <input type="text" name="search" class="form-control form-control-sm me-2" style="width: 250px;" placeholder="Поиск по серии или №..." value="{{ search_query }}">
+            <button type="submit" class="btn btn-sm btn-primary">Искать</button>
+            {% if search_query %}
+                <a href="/admin/archive" class="btn btn-sm btn-outline-secondary ms-2">Сбросить</a>
+            {% endif %}
+        </form>
+    </div>
 
     <div class="card shadow-sm border-0" style="border-radius: 12px;">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="bg-light">
                     <tr>
-                        <th class="ps-4 py-3 text-muted small text-uppercase" style="width: 80px;">ID</th>
+                        <th class="ps-4 py-3 text-muted small text-uppercase">ID</th>
                         <th class="py-3 text-muted small text-uppercase">Поезд (МВПС)</th>
                         <th class="py-3 text-muted small text-uppercase">Вид ремонта</th>
                         <th class="py-3 text-muted small text-uppercase">Бригада</th>
-                        <th class="py-3 text-muted small text-uppercase">Дата плана</th>
-                        <th class="py-3 text-muted small text-uppercase text-end pe-4">Действия</th>
+                        <th class="py-3 text-muted small text-uppercase">Дата начала</th>
+                        <th class="py-3 text-muted small text-uppercase">Фактическое окончание</th>
+                        <th class="py-3 text-muted small text-uppercase">Просрочка</th>
+                        <th class="pe-4 py-3 text-muted small text-uppercase text-end">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for task in tasks %}
                     <tr>
-                        <td class="ps-4 text-muted fw-bold">{{ task.id }}</td>
+                        <td class="ps-4 fw-bold text-muted">{{ task.id }}</td>
                         <td>
-                            <div style="font-weight: 500;">{{ task.rolling_stock.series }}</div>
+                            <div style="font-weight: 600;">{{ task.rolling_stock.series }}</div>
                             <small class="text-muted">№ {{ task.rolling_stock.inventory_number }}</small>
                         </td>
                         <td>
                             <span class="badge bg-secondary" style="border-radius: 6px;">{{ task.repair_type.value }}</span>
                         </td>
                         <td>{{ task.brigade.name if task.brigade else '—' }}</td>
-                        <td>{{ task.planned_end_date.strftime('%d.%m.%Y') if task.planned_end_date else '—' }}</td>
-                        <td class="text-end pe-4">
-                            <a href="/admin/dashboard/task/{{ task.id }}" class="btn btn-sm btn-light" style="border-radius: 6px;">
-                                <i class="fa-solid fa-eye"></i> Подробнее
+                        <td>{{ task.start_date.strftime('%d.%m.%Y %H:%M') if task.start_date else '—' }}</td>
+                        <td>{{ task.actual_end_date.strftime('%d.%m.%Y %H:%M') if task.actual_end_date else '—' }}</td>
+
+                        <td>
+                            {% if task.overdue_hours > 0 %}
+                                <span class="badge bg-danger" style="border-radius: 4px;">{{ task.overdue_hours }} ч.</span>
+                            {% else %}
+                                <span class="text-success small fw-bold">Нет</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="pe-4 text-end">
+                            <a href="/admin/dashboard/task/{{ task.id }}" class="btn btn-sm btn-outline-secondary" style="border-radius: 6px;">
+                                <i class="fa-solid fa-eye me-1"></i>Подробнее
                             </a>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center py-5 text-muted">
-                            <i class="fa-solid fa-folder-open mb-3" style="font-size: 2rem; opacity: 0.5;"></i><br>
-                            Архив пуст. Нет завершенных заданий.
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            {% if search_query %}
+                                По вашему запросу ничего не найдено.
+                            {% else %}
+                                Архив пуст.
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

@@ -1,7 +1,7 @@
 {% extends "sqladmin/layout.html" %}
 
 {% block content %}
-<div class="container-fluid mt-4" style="max-width: 1000px;">
+<div class="container-fluid mt-4" style="max-width: 1200px;">
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/admin/dashboard" class="text-decoration-none">Дашборд</a></li>
@@ -16,28 +16,40 @@
                     <h4 class="mb-1" style="font-weight: 600;">{{ task.repair_type.value }} — {{ task.rolling_stock.series }}</h4>
                     <p class="text-muted mb-0">Инвентарный номер: <strong>{{ task.rolling_stock.inventory_number }}</strong></p>
                 </div>
-                <span class="badge {% if task.status.value == 'Завершено' %}bg-success{% elif task.status.value == 'В работе' %}bg-primary{% else %}bg-warning{% endif %}"
+                <span class="badge {% if task.status.value == 'Завершено' %}bg-success{% elif task.status.value == 'В работе' %}bg-primary{% else %}bg-warning text-dark{% endif %}"
                       style="font-size: 0.9rem; padding: 8px 16px; border-radius: 20px;">
                     {{ task.status.value }}
                 </span>
             </div>
 
             <div class="row mt-4">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <small class="text-muted text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Бригада</small>
                     <p class="mb-0" style="font-weight: 500;">{{ task.brigade.name if task.brigade else 'Не назначена' }}</p>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <small class="text-muted text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Мастер</small>
                     <p class="mb-0" style="font-weight: 500;">{{ task.master_name_snapshot or '—' }}</p>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <small class="text-muted text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Начало</small>
                     <p class="mb-0" style="font-weight: 500;">{{ task.start_date.strftime('%d.%m.%Y %H:%M') if task.start_date else '—' }}</p>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <small class="text-muted text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">План завершения</small>
                     <p class="mb-0" style="font-weight: 500;">{{ task.planned_end_date.strftime('%d.%m.%Y %H:%M') if task.planned_end_date else '—' }}</p>
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Факт завершения</small>
+                    <p class="mb-0" style="font-weight: 500;">{{ task.actual_end_date.strftime('%d.%m.%Y %H:%M') if task.actual_end_date else 'В работе' }}</p>
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted text-uppercase d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Просрочка</small>
+                    {% if task.overdue_hours > 0 %}
+                        <span class="badge bg-danger" style="font-size: 0.85rem; padding: 5px 10px;">Да ({{ task.overdue_hours }} ч.)</span>
+                    {% else %}
+                        <p class="mb-0 text-success" style="font-weight: 600;">Нет (0 ч.)</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -50,9 +62,10 @@
                 <thead class="bg-light">
                     <tr>
                         <th class="ps-4 py-3 text-muted small text-uppercase" style="width: 50px;">#</th>
-                        <th class="py-3 text-muted small text-uppercase">Название этапа</th>
+                        <th class="py-3 text-muted small text-uppercase" style="width: 35%;">Название этапа</th>
                         <th class="py-3 text-muted small text-uppercase">Статус</th>
-                        <th class="py-3 text-muted small text-uppercase">Время выполнения</th>
+                        <th class="py-3 text-muted small text-uppercase">Время</th>
+                        <th class="py-3 text-muted small text-uppercase" style="width: 20%;">Исполнители (Доп)</th>
                         <th class="py-3 text-muted small text-uppercase">Запчасти</th>
                     </tr>
                 </thead>
@@ -60,18 +73,35 @@
                     {% for stage in task.stages|sort(attribute='id') %}
                     <tr>
                         <td class="ps-4 text-muted">{{ loop.index }}</td>
+
                         <td>
-                            <div style="font-weight: 500;">{{ stage.name }}</div>
+                            <div style="font-weight: 500; font-size: 1.05rem;">{{ stage.name }}</div>
                             {% if stage.pause_reason %}
-                            <small class="text-danger">Причина паузы: {{ stage.pause_reason }}</small>
+                                {% if stage.status.value == 'Ожидание запчастей' %}
+                                <div class="mt-2 p-2 bg-danger-subtle border border-danger-subtle rounded small text-danger shadow-sm">
+                                    <strong><i class="fa-solid fa-cart-arrow-down me-1"></i> Заявка на склад (Комментарий мастера):</strong><br>
+                                    {{ stage.pause_reason }}
+                                </div>
+                                {% else %}
+                                <small class="text-muted d-block mt-1"><i class="fa-solid fa-pause me-1"></i>Причина паузы: {{ stage.pause_reason }}</small>
+                                {% endif %}
                             {% endif %}
                         </td>
+
                         <td>
-                            <span class="badge {% if stage.status.value == 'Завершено' %}bg-success-subtle text-success border border-success-subtle{% elif stage.status.value == 'В работе' %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-light text-muted border{% endif %}"
-                                  style="border-radius: 6px; padding: 4px 10px;">
+                            {% set status_colors = {
+                                'Ожидание': 'bg-secondary-subtle text-secondary border-secondary-subtle',
+                                'В работе': 'bg-success-subtle text-success border-success-subtle',
+                                'Пауза': 'bg-warning-subtle text-warning border-warning-subtle',
+                                'Ожидание запчастей': 'bg-danger text-white border-danger',
+                                'Завершено': 'bg-light text-muted border'
+                            } %}
+                            <span class="badge border {{ status_colors.get(stage.status.value, 'bg-light text-dark') }}"
+                                  style="border-radius: 6px; padding: 6px 12px; font-weight: 500;">
                                 {{ stage.status.value }}
                             </span>
                         </td>
+
                         <td class="small">
                             {% if stage.start_time %}
                             <div>{{ stage.start_time.strftime('%H:%M') }} — {{ stage.end_time.strftime('%H:%M') if stage.end_time else '...' }}</div>
@@ -79,11 +109,39 @@
                             <span class="text-muted">Не начат</span>
                             {% endif %}
                         </td>
+
+                        <td>
+                            {% if stage.brigades %}
+                                {% for b in stage.brigades %}
+                                <div class="small mb-1 d-flex align-items-center">
+                                    <span class="badge bg-secondary me-1" style="font-size: 0.70rem;">Доп</span>
+                                    <strong>{{ b.name }}</strong>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+
+                            {% if task.status.value != 'Завершено' and stage.status.value != 'Завершено' %}
+                            <div class="d-flex gap-1 mt-2">
+                                <select id="brigade-select-{{ stage.id }}" class="form-select form-select-sm" style="font-size: 0.8rem;">
+                                    <option value="">+ Бригаду</option>
+                                    {% for brigade in brigades %}
+                                        {% if brigade.id != task.brigade_id and brigade not in stage.brigades %}
+                                            <option value="{{ brigade.id }}">{{ brigade.name }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-sm btn-outline-primary" style="padding: 2px 8px;" onclick="assignBrigadeToStage({{ stage.id }})">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
+
                         <td>
                             {% if stage.part_associations %}
                                 {% for assoc in stage.part_associations %}
-                                <div class="small text-truncate" style="max-width: 150px;" title="{{ assoc.part.nomenclature }}">
-                                    {{ assoc.part.nomenclature }} ({{ assoc.quantity_used }} шт.)
+                                <div class="small text-truncate" style="max-width: 200px;" title="{{ assoc.part.nomenclature }}">
+                                    <i class="fa-solid fa-gear text-secondary me-1"></i>{{ assoc.part.nomenclature }} (<strong>{{ assoc.quantity_used }} шт.</strong>)
                                 </div>
                                 {% endfor %}
                             {% else %}
@@ -97,4 +155,25 @@
         </div>
     </div>
 </div>
+
+<script>
+function assignBrigadeToStage(stageId) {
+    const brigadeId = document.getElementById(`brigade-select-${stageId}`).value;
+    if (!brigadeId) return alert("Пожалуйста, выберите бригаду из списка.");
+
+    const token = "{{ request.session.get('token') }}";
+
+    fetch(`/api/v1/repair-stages/${stageId}/assign-brigade/${brigadeId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(async response => {
+        if (response.ok) window.location.reload();
+        else alert("Ошибка бизнес-логики: " + ((await response.json()).detail || "Сбой"));
+    }).catch(() => alert("Ошибка сети."));
+}
+</script>
 {% endblock %}

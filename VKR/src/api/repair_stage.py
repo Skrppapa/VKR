@@ -11,6 +11,12 @@ async def assign_part(db: DBDep, stage_id: int, part_id: int, quantity: int = 1)
     service = RepairStageService(db)
     return await service.add_part_to_repair_stage(stage_id, part_id, quantity)
 
+@router.post("/{stage_id}/assign-brigade/{brigade_id}")
+async def assign_brigade(db: DBDep, stage_id: int, brigade_id: int):
+    """Назначить дополнительную бригаду на этап"""
+    service = RepairStageService(db)
+    return await service.assign_brigade_to_stage(stage_id, brigade_id)
+
 @router.patch("/{stage_id}/status", response_model=RepairStageResponse)
 async def update_stage_status(stage_id: int, status_data: StageStatusPatch, db: DBDep):
     """Изменение статуса этапа"""

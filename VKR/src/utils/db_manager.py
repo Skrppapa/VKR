@@ -1,3 +1,6 @@
+import traceback
+from src.utils.logger import log
+from sqlalchemy.exc import SQLAlchemyError
 from src.repositories.rolling_stock import RollingStockRepository
 from src.repositories.catalogs import RegulationRepository, PartRepository, BrigadeRepository
 from src.repositories.repair_tasks import RepairTaskRepository
@@ -22,11 +25,21 @@ class DBManager:
 
         return self
 
-    async def __aexit__(self, *args):
-        await self.session.rollback()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            log.error(f"Сбой транзакции БД: {exc_type.__name__} - {exc_val}")
+            log.debug(f"Traceback: {''.join(traceback.format_tb(exc_tb))}")
+            await self.session.rollback()
         await self.session.close()
 
     async def commit(self):
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except SQLAlchemyError as e:
+            log.error(f"Ошибка при фиксации изменений (commit): {str(e)}")
+            await self.session.rollback()
+            raise
+
+
 
 

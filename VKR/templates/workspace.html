@@ -42,14 +42,11 @@
     const API_BASE = '/api/v1';
 
     // --- ЛОГИКА АВТОРИЗАЦИИ ---
-    // 1. При загрузке страницы проверяем, есть ли токен
     const token = localStorage.getItem('access_token');
     if (!token) {
-        window.location.href = '/login'; // Если нет, выкидываем на логин
+        window.location.href = '/login';
     }
 
-    // 2. Создаем универсальную функцию-обертку для fetch
-    // Она автоматически добавляет токен и обрабатывает ошибку 401
     async function fetchWithAuth(url, options = {}) {
         const headers = {
             'Authorization': `Bearer ${token}`,
@@ -59,7 +56,6 @@
         const response = await fetch(url, { ...options, headers });
 
         if (response.status === 401) {
-            // Токен недействителен (или истек) - очищаем хранилище и выкидываем на логин
             localStorage.removeItem('access_token');
             window.location.href = '/login';
             throw new Error("Unauthorized");
@@ -68,13 +64,12 @@
         return response;
     }
 
-    // Переменные для хранения контекста модального окна
     let currentModalStageId = null;
     let currentModalTaskId = null;
 
     document.addEventListener('DOMContentLoaded', loadActiveTasks);
 
-    // --- 1. ЗАГРУЗКА ЗАДАНИЙ (Без изменений) ---
+    // --- 1. ЗАГРУЗКА ЗАДАНИЙ ---
     async function loadActiveTasks() {
         const container = document.getElementById('tasks-container');
         try {
@@ -119,13 +114,12 @@
                 container.appendChild(card);
             });
         } catch (error) {
-            // Добавляем вот эту строчку, чтобы остановить крутилку:
             container.setAttribute('aria-busy', 'false');
             container.innerHTML = '<p style="color: #ff3b30;">Не удалось загрузить задания.</p>';
         }
     }
 
-    // --- 2. ЗАГРУЗКА ЭТАПОВ (Добавлена логика для запчастей) ---
+    // --- 2. ЗАГРУЗКА ЭТАПОВ ---
     async function loadStages(taskId) {
         const container = document.getElementById(`stages-container-${taskId}`);
         try {
@@ -138,11 +132,20 @@
             taskData.stages.forEach(stage => {
                 let actionsHtml = '';
                 let rowClass = 'stage-row';
+                let commentHtml = '';
+
+                // Вывод комментария/заявки мастера
+                if (stage.pause_reason) {
+                    if (stage.status === 'Ожидание запчастей') {
+                        commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #af52de;">🛒 Заявка на склад: ${stage.pause_reason}</div>`;
+                    } else if (stage.status === 'Пауза') {
+                        commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #ff9f0a;">⏸ Причина паузы: ${stage.pause_reason}</div>`;
+                    }
+                }
 
                 if (stage.status === 'Ожидание') {
                     actionsHtml = `<button class="outline" style="padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0;" onclick="changeStageStatus(${stage.id}, 'В работе', ${taskId})">Начать</button>`;
                 } else if (stage.status === 'В работе') {
-                    // Этап в работе: можно завершить, поставить на обычную паузу или перевести в ожидание запчастей
                     actionsHtml = `
                         <button class="outline" style="color: #34c759; border-color: #34c759; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="changeStageStatus(${stage.id}, 'Завершено', ${taskId})">Завершить</button>
                         <button class="outline" style="color: #ff9f0a; border-color: #ff9f0a; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="changeStageStatus(${stage.id}, 'Пауза', ${taskId})">Пауза</button>
@@ -150,9 +153,10 @@
                     `;
                 } else if (stage.status === 'Ожидание запчастей') {
                     rowClass += ' paused';
-                    // Этап ждет детали: появляется кнопка запроса со склада
+                    // ДОБАВЛЕНО: Гибридная система для мастера
                     actionsHtml = `
                         <button style="background: #af52de; border-color: #af52de; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="openPartModal(${stage.id}, ${taskId})">+ Взять со склада</button>
+                        <button class="outline" style="color: #ff3b30; border-color: #ff3b30; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="orderPartsToDispatcher(${stage.id}, ${taskId})">Заказать диспетчеру</button>
                         <button class="outline" style="color: #007aff; border-color: #007aff; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0;" onclick="changeStageStatus(${stage.id}, 'В работе', ${taskId})">Возобновить</button>
                     `;
                 } else if (stage.status === 'Пауза') {
@@ -162,7 +166,7 @@
                     rowClass += ' completed';
                 }
 
-                // Отображаем списанные детали, если они есть
+                // Отображение использованных деталей
                 let partsHtml = '';
                 if (stage.part_associations && stage.part_associations.length > 0) {
                     partsHtml = '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #86868b;">🛠 Использовано: ';
@@ -175,9 +179,10 @@
                         <div>
                             <strong style="display: block; font-size: 0.95rem;">${stage.name}</strong>
                             <small class="badge" style="font-size: 0.7rem; margin-top: 0.3rem; display: inline-block;">${stage.status}</small>
+                            ${commentHtml}
                             ${partsHtml}
                         </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;">
                             ${actionsHtml}
                         </div>
                     </div>
@@ -191,7 +196,7 @@
         }
     }
 
-    // --- 3. ИЗМЕНЕНИЕ СТАТУСА (Без изменений) ---
+    // --- 3. ИЗМЕНЕНИЕ СТАТУСА ---
     async function changeStageStatus(stageId, newStatus, taskId) {
         let reason = null;
         if (newStatus === 'Пауза') {
@@ -218,26 +223,47 @@
         }
     }
 
-    // --- 4. ЛОГИКА МОДАЛЬНОГО ОКНА ДЛЯ ЗАПЧАСТЕЙ ---
+    // --- 4. ЗАКАЗ ДЕТАЛЕЙ ДИСПЕТЧЕРУ ---
+    async function orderPartsToDispatcher(stageId, taskId) {
+        const reason = prompt("Заявка на склад. Опишите, какие детали необходимы для работы:");
+        if (!reason) return;
+
+        try {
+            // Отправляем PATCH с текстом заявки (статус остается тем же)
+            const response = await fetchWithAuth(`${API_BASE}/repair-stages/${stageId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Ожидание запчастей', pause_reason: reason })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                alert("Ошибка: " + err.detail);
+                return;
+            }
+            await loadStages(taskId);
+        } catch (e) {
+            alert("Ошибка соединения с сервером");
+        }
+    }
+
+    // --- 5. ЛОГИКА МОДАЛЬНОГО ОКНА ДЛЯ САМОСТОЯТЕЛЬНОГО СПИСАНИЯ ---
     async function openPartModal(stageId, taskId) {
         currentModalStageId = stageId;
         currentModalTaskId = taskId;
 
         const select = document.getElementById('part-select');
         select.innerHTML = '<option value="">Загрузка каталога...</option>';
-        document.getElementById('part-quantity').value = 1; // Сброс количества
+        document.getElementById('part-quantity').value = 1;
 
-        // Открываем окно
         document.getElementById('part-modal').setAttribute('open', 'true');
 
         try {
-            // Дергаем справочник запчастей
             const response = await fetchWithAuth(`${API_BASE}/catalogs/parts`);
             const parts = await response.json();
 
             select.innerHTML = '<option value="" disabled selected>Выберите деталь</option>';
             parts.forEach(p => {
-                // Показываем деталь и ее остаток на складе
                 select.innerHTML += `<option value="${p.id}">${p.nomenclature} (На складе: ${p.stock_quantity} шт.)</option>`;
             });
         } catch (e) {
@@ -259,7 +285,6 @@
         }
 
         try {
-            // Дергаем роутер списания детали
             const response = await fetchWithAuth(`${API_BASE}/repair-stages/${currentModalStageId}/assign-part/${partId}?quantity=${quantity}`, {
                 method: 'POST'
             });
@@ -270,9 +295,7 @@
                 return;
             }
 
-            // Успех!
             closePartModal();
-            // Перезагружаем этапы, чтобы списанная деталь отобразилась под названием этапа
             await loadStages(currentModalTaskId);
 
         } catch (e) {

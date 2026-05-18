@@ -4,6 +4,7 @@ from src.models.repair_stages import RepairStage
 from src.models.enums import StageStatusEnum, TaskStatusEnum
 from src.schemas.repair_stages import StageStatusPatch
 from src.utils.db_manager import DBManager
+from src.utils.logger import log
 
 
 class RepairStageService:
@@ -20,6 +21,8 @@ class RepairStageService:
             raise HTTPException(404, "Деталь не найдена")
 
         if part.stock_quantity < quantity:
+            log.warning(
+                f"Отказ списания: недостаточно деталей '{part.nomenclature}'. Запрошено: {quantity}, доступно: {part.stock_quantity}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Недостаточно на складе. Доступно: {part.stock_quantity}, нужно: {quantity}"
@@ -28,7 +31,32 @@ class RepairStageService:
         await self.db.parts.use_part(part, quantity, stage_id)
         await self.db.commit()
 
+        log.info(f"Успешно списано {quantity} ед. детали '{part.nomenclature}' для этапа ID {stage_id}")
         return {"message": "Детали успешно списаны и привязаны к этапу"}
+
+    async def assign_brigade_to_stage(self, stage_id: int, brigade_id: int):
+        """Назначить вспомогательную бригаду на конкретный этап"""
+        stage = await self.db.stages.get_with_resources(stage_id)
+        if not stage:
+            raise HTTPException(404, "Этап не найден")
+
+        brigade = await self.db.brigades.get_by_id(brigade_id)
+        if not brigade:
+            raise HTTPException(404, "Бригада не найдена")
+
+        # Проверка, не назначена ли уже эта бригада на этот этап
+        if any(b.id == brigade_id for b in stage.brigades):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Эта бригада уже назначена на данный этап"
+            )
+
+        # Добавляем бригаду и сохраняем
+        stage.brigades.append(brigade)
+        await self.db.commit()
+
+        log.info(f"Бригада '{brigade.name}' назначена на этап ID {stage_id} ('{stage.name}')")
+        return {"message": f"Бригада {brigade.name} успешно добавлена к этапу"}
 
     async def update_stage_status(self, stage_id: int, status_data: StageStatusPatch) -> RepairStage:
         """Обновление статуса этапа"""
@@ -44,6 +72,7 @@ class RepairStageService:
 
         # Защита Архива от изменений
         if task.status == TaskStatusEnum.COMPLETED:
+            log.warning(f"Попытка изменить статус этапа (ID {stage_id}) в завершенной задаче (ID {task.id})")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Нельзя изменять этапы завершенной (архивной) задачи."
@@ -53,10 +82,15 @@ class RepairStageService:
         old_status = stage.status
 
         if new_status == old_status:
+            # ДОРАБОТКА: Если статус тот же, но пришел новый или измененный текст заявки/паузы
+            if status_data.pause_reason and status_data.pause_reason != stage.pause_reason:
+                stage.pause_reason = status_data.pause_reason
+                await self.db.commit()
             return stage
 
         # Зашита завершенного этапа от изменений
         if old_status == StageStatusEnum.COMPLETED:
+            log.warning(f"Попытка отката статуса для завершенного этапа ID {stage_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Этот этап уже завершен. Откат статуса невозможен."
@@ -72,6 +106,8 @@ class RepairStageService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="При ручном переходе в паузу необходимо указать причину (pause_reason)."
                 )
+
+            log.info(f"Этап ID {stage_id} приостановлен. Причина: {status_data.pause_reason or 'Ожидание запчастей'}")
 
             stage.pause_reason = status_data.pause_reason
             stage.last_paused_at = datetime.now(timezone.utc)
@@ -93,10 +129,13 @@ class RepairStageService:
 
                 if incomplete_prev_stages:
                     names = ", ".join([s.name for s in incomplete_prev_stages])
+                    log.warning(f"Попытка нарушения очередности: старт этапа ID {stage_id} до завершения: {names}")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Нельзя начать этот этап. Не завершены предыдущие этапы: {names}"
                     )
+
+            log.info(f"Этап ID {stage_id} ('{stage.name}') переведен в работу.")
 
             # Вариант 1: Снятие с паузы
             if old_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS] and stage.last_paused_at:
@@ -129,12 +168,14 @@ class RepairStageService:
 
         # Завершение этапа
         elif new_status == StageStatusEnum.COMPLETED:
+            log.info(f"Этап ID {stage_id} ('{stage.name}') завершен.")
             if not stage.start_time:
                 stage.start_time = datetime.now(timezone.utc)
             stage.end_time = datetime.now(timezone.utc)
 
             is_last_stage = (current_index == len(task_stages) - 1)
             if is_last_stage:
+                log.info(f"Все этапы выполнены. Ремонтное задание ID {task.id} переведено в статус COMPLETED.")
                 task.status = TaskStatusEnum.COMPLETED
                 task.actual_end_date = datetime.now(timezone.utc)
 

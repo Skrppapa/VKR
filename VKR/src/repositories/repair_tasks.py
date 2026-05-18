@@ -70,3 +70,4 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         )
         result = await self.session.execute(query)
         return result.scalar()
+
