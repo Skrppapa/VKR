@@ -13,7 +13,7 @@ class AuthService:
 
         log.info(f"Попытка авторизации пользователя: {username}")
 
-        # Поиск юзера
+        # Поиск пользователя
         user = await self.db.users.get_by_username(username)
 
         # Проверка пароля

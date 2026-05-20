@@ -69,7 +69,9 @@ class RepairTaskService:
         log.info(
             f"Создано задание ID {task_id} ({task_in.repair_type.value}) для МВПС {train.series} ({train.inventory_number}). Назначена бригада: {brigade.name}")
 
-        return await self.db.tasks.get_by_id(task_id)
+        return await self.db.tasks.get_task_with_train(task_id)
+
+
 
     async def delete_task(self, task_id: int):
         """Удалить задание"""

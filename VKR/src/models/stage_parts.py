@@ -4,7 +4,7 @@ from sqlalchemy import ForeignKey, Integer
 
 
 class StagePart(Base):
-    """Модель для связи Этап - Запчасть"""
+    """Связь Этап - Запчасть"""
     __tablename__ = "stage_parts"
 
     # Составной первичный ключ из двух внешних ключей

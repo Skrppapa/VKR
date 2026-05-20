@@ -36,22 +36,17 @@ app = FastAPI(
 )
 
 
-# Добавляем Middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
 
-    # 1. Логируем, что запрос пришел
     client_ip = request.client.host if request.client else "Unknown"
     log.info(f"Incoming request: {request.method} {request.url.path} from {client_ip}")
 
-    # 2. Передаем запрос дальше в твою программу
     response = await call_next(request)
 
-    # 3. Высчитываем время выполнения и логируем результат
-    process_time = (time.time() - start_time) * 1000  # Переводим в миллисекунды
+    process_time = (time.time() - start_time) * 1000
 
-    # Если ошибка 4xx или 5xx - пишем как WARNING или ERROR
     if response.status_code >= 500:
         log.error(f"Response: {response.status_code} | Time: {process_time:.2f}ms | Path: {request.url.path}")
     elif response.status_code >= 400:

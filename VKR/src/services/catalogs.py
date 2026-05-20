@@ -80,7 +80,7 @@ class RegulationService:
     async def create(self, data_in: RegulationCreate):
         """Создание регламента с этапами"""
 
-        # Проверяем существует ли в бд модель МВПС для которой создаем регламент
+        # Проверка существует ли МВПС для которой создаем регламент
         series_exists = await self.db.trains.check_series_exists(data_in.train_series)
         if not series_exists:
             raise HTTPException(
@@ -88,7 +88,7 @@ class RegulationService:
                 detail=f"Невозможно создать регламент: МВПС серии '{data_in.train_series}' нет в системе."
             )
 
-        # Проверяем наличие дубликатов регламента
+        # Проверка дубликатов регламента
         existing_reg = await self.db.regulations.get_by_type_and_series(
             repair_type=data_in.repair_type,
             train_series=data_in.train_series

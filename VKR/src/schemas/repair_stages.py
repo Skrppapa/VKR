@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from src.models.enums import StageStatusEnum
 
-# Схема для детали
+
 class PartShortResponse(BaseModel):
     id: int
     nomenclature: str
@@ -39,7 +39,6 @@ class RepairStageUpdate(RepairStageBase):
     status: Optional[StageStatusEnum] = None
 
 
-# Схема ответа (Чтение этапа)
 class RepairStageResponse(RepairStageBase):
     id: int
     repair_task_id: int

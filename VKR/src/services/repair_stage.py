@@ -44,14 +44,12 @@ class RepairStageService:
         if not brigade:
             raise HTTPException(404, "Бригада не найдена")
 
-        # Проверка, не назначена ли уже эта бригада на этот этап
         if any(b.id == brigade_id for b in stage.brigades):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Эта бригада уже назначена на данный этап"
             )
 
-        # Добавляем бригаду и сохраняем
         stage.brigades.append(brigade)
         await self.db.commit()
 
@@ -82,7 +80,6 @@ class RepairStageService:
         old_status = stage.status
 
         if new_status == old_status:
-            # ДОРАБОТКА: Если статус тот же, но пришел новый или измененный текст заявки/паузы
             if status_data.pause_reason and status_data.pause_reason != stage.pause_reason:
                 stage.pause_reason = status_data.pause_reason
                 await self.db.commit()

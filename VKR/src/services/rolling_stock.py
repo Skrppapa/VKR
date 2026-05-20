@@ -17,7 +17,6 @@ class RollingStockService:
                 detail=f"МВПС с номером {train_in.inventory_number} уже существует."
             )
 
-        # Создание
         new_train = await self.db.trains.create(train_in)
 
         await self.db.commit()

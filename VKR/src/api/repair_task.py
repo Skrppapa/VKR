@@ -9,7 +9,7 @@ router = APIRouter(prefix="/repair-tasks", tags=["Ремонтные задан�
 
 @router.post("/", response_model=RepairTaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(task_in: RepairTaskCreate, db: DBDep):
-    """Создание задания на основе регламента"""
+    """Создать задание на основе регламента"""
     service = RepairTaskService(db)
     return await service.create_task(task_in)
 

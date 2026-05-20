@@ -16,7 +16,7 @@ async def get_rolling_stocks(db: DBDep, skip: int = 0, limit: int = 100):
 
 @router.get("/{train_id}", response_model=RollingStockResponse)
 async def get_rolling_stock(train_id: int, db: DBDep):
-    """Получить МВПС по ID"""
+    """Получить конкретный МВПС по ID"""
     service = RollingStockService(db)
     return await service.get_train_by_id(train_id)
 
@@ -28,7 +28,7 @@ async def create_rolling_stock(train_in: RollingStockCreate, db: DBDep):
 
 @router.patch("/{train_id}", response_model=RollingStockResponse)
 async def update_rolling_stock(train_id: int, update_data: RollingStockUpdate, db: DBDep):
-    """Обновить данные о МВПС"""
+    """Обновить МВПС"""
     service = RollingStockService(db)
     return await service.update_train(train_id, update_data)
 
@@ -40,6 +40,6 @@ async def delete_rolling_stock(train_id: int, db: DBDep):
 
 @router.get("/{train_id}/planning", response_model=TrainPlanningResponse)
 async def get_train_planning(train_id: int, db: DBDep):
-    """Получить план ремонтов для конкретного МВПС"""
+    """Получить план ремонтов для МВПС"""
     service = PlanningService(db)
     return await service.get_train_planning_status(train_id)

@@ -8,7 +8,7 @@ from src.schemas.regulations import RegulationCreate, RegulationUpdate, Regulati
 
 router = APIRouter(prefix="/catalogs")
 
-# --- БРИГАДЫ ---
+# БРИГАДЫ
 @router.get("/brigades", tags=["Справочники: Бригады"], response_model=list[WorkBrigadeResponse])
 async def get_brigades(db: DBDep, skip: int = 0, limit: int = 100):
     service = BrigadeService(db)
@@ -39,7 +39,7 @@ async def delete_brigade(id: int, db: DBDep):
     await service.delete(id)
 
 
-# --- ЗАПЧАСТИ ---
+# ЗАПЧАСТИ
 @router.get("/parts", tags=["Справочники: Запчасти"], response_model=list[PartAndMaterialResponse])
 async def get_parts(db: DBDep, skip: int = 0, limit: int = 100):
     service = PartService(db)
@@ -69,7 +69,7 @@ async def delete_part(id: int, db: DBDep):
     service = PartService(db)
     await service.delete(id)
 
-# --- НОРМАТИВЫ ---
+# НОРМАТИВЫ
 @router.get("/regulations", tags=["Справочники: Регламенты"], response_model=list[RegulationResponse])
 async def get_regulations(db: DBDep, skip: int = 0, limit: int = 100):
     service = RegulationService(db)

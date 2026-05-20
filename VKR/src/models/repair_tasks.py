@@ -19,8 +19,6 @@ class RepairTask(Base):
     planned_end_date: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     actual_end_date: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     total_paused_seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-
-
     rolling_stock: Mapped["RollingStock"] = relationship(back_populates="repair_tasks")
     brigade: Mapped[Optional["WorkBrigade"]] = relationship(back_populates="repair_tasks")
     stages: Mapped[list["RepairStage"]] = relationship(
@@ -36,25 +34,25 @@ class RepairTask(Base):
 
     @property
     def baseline_end_date(self):
-        """Вычисление времени окончания по регламенту"""
+        """Вычисление планового времени окончания по регламенту"""
         if not self.planned_end_date:
             return None
 
-        # Если паузы есть, вычитаем их из текущего плана
+        # Вычитаем паузы (при наличии) из текущего плана
         pauses = self.total_paused_seconds or 0
         return self.planned_end_date - datetime.timedelta(seconds=pauses)
 
 
     @property
     def formatted_paused_time(self) -> str:
-        """Переводит секунды в читаемый формат: X ч Y мин"""
+        """Перевод секунд в формат часов и минут"""
         if not self.total_paused_seconds:
             return "0 ч 0 мин"
 
         hours = self.total_paused_seconds // 3600
         minutes = (self.total_paused_seconds % 3600) // 60
 
-        # Если пауза длилась меньше минуты
+        # Если пауза меньше минуты
         if hours == 0 and minutes == 0 and self.total_paused_seconds > 0:
             return f"{self.total_paused_seconds} сек"
 
@@ -62,14 +60,14 @@ class RepairTask(Base):
 
     @property
     def overdue_hours(self) -> int:
-        """Вычисляет количество часов просрочки"""
+        """Длительность просрочки"""
         if not self.planned_end_date:
             return 0
 
-        # Сравниваем план с фактом завершения. Если еще в работе — с текущим временем
+        # Сравниваем план с фактом завершения, или если еще в работе — с текущим временем
         end_time = self.actual_end_date if self.actual_end_date else datetime.datetime.now(datetime.timezone.utc)
         delta = end_time - self.planned_end_date
 
         if delta.total_seconds() > 0:
-            return int(delta.total_seconds() / 3600)  # Возвращаем просрочку в часах
+            return int(delta.total_seconds() / 3600)
         return 0

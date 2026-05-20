@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <title>Вход - {{ admin.title }}</title>
+    <link href="{{ request.url_for('admin:statics', path='css/tabler.min.css') }}" rel="stylesheet"/>
+  </head>
+  <body class="d-flex flex-column bg-light">
+    <div class="page page-center">
+      <div class="container-tight py-4">
+        <form class="card card-md shadow-sm" action="{{ request.url }}" method="post" autocomplete="off">
+          <div class="card-body">
+            <h2 class="card-title text-center mb-4">Вход в {{ admin.title }}</h2>
+
+            <div class="mb-3">
+              <label class="form-label">Логин</label>
+              <input type="text" name="username" class="form-control" placeholder="Введите имя пользователя" required autofocus>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label">Пароль</label>
+              <input type="password" name="password" class="form-control" placeholder="Введите пароль" required autocomplete="off">
+            </div>
+
+            <div class="form-footer">
+              <button type="submit" class="btn btn-primary w-100">Войти</button>
+            </div>
+
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

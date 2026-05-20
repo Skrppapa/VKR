@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from typing import Optional
 from src.repositories.base import BaseRepository
 from src.models.rolling_stocks import RollingStock
@@ -16,18 +15,8 @@ class RollingStockRepository(BaseRepository[RollingStock, RollingStockCreate, Ro
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    # async def get_with_tasks(self, obj_id: int) -> Optional[RollingStock]:
-    #     """Достать МВПС сразу с его ремонтными заданиями"""
-    #     query = (
-    #         select(self.model)
-    #         .where(self.model.id == obj_id)
-    #         .options(selectinload(self.model.repair_tasks))
-    #     )
-    #     result = await self.session.execute(query)
-    #     return result.scalar_one_or_none()
-
     async def check_series_exists(self, series: str) -> bool:
-        """Проверка - заведен ли хоть один поезд указанной серии"""
+        """Есть ли хоть один поезд указанной серии"""
         query = select(self.model).where(self.model.series == series).limit(1)
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None

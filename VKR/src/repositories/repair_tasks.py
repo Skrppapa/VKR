@@ -41,7 +41,7 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         return result.scalar_one_or_none()
 
     async def get_with_stages(self, task_id: int) -> Optional[RepairTask]:
-        """Достать задание только с его этапами"""
+        """Достать задание только с этапами"""
         query = (
             select(self.model)
             .where(self.model.id == task_id)
@@ -59,7 +59,7 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         return list(result.scalars().all())
 
     async def get_last_completed_date(self, train_id: int, repair_type: TaskStatusEnum) -> Optional[datetime]:
-        """Найти дату завершения последнего ремонта указанного типа для поезда"""
+        """Найти дату завершения последнего ремонта указанного типа для МВПС"""
         query = (
             select(func.max(self.model.actual_end_date))
             .where(
@@ -70,4 +70,14 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         )
         result = await self.session.execute(query)
         return result.scalar()
+
+    async def get_task_with_train(self, task_id: int) -> Optional[RepairTask]:
+        """Достать задание с подгруженным МВПС"""
+        query = (
+            select(self.model)
+            .where(self.model.id == task_id)
+            .options(selectinload(self.model.rolling_stock))
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 

@@ -14,15 +14,14 @@ class AdminAuth(AuthenticationBackend):
             query = select(User).where(User.username == username)
             user = (await session.execute(query)).scalar_one_or_none()
 
-            # Проверяем существование пользователя и совпадение пароля
+            # Существует ли юзер и совпадает ли пароль
             if not user or not verify_password(password, user.hashed_password):
                 return False
 
-            # Строгая проверка роли: только admin имеет доступ к SqlAdmin
+            # Только admin имеет доступ к SqlAdmin
             if user.role != "admin":
                 return False
 
-            # Если всё ок — генерируем токен и кладем в сессию браузера
             access_token = create_access_token(data={"sub": user.username})
             request.session.update({"token": access_token})
 

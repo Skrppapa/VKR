@@ -31,7 +31,7 @@ from wtforms.fields import SelectField
 
 
 class BaseModelView(ModelView):
-    """Базовый класс, который подтягивает русификацию для всех таблиц"""
+    """Русификация"""
     list_template = "custom_list.html"
     create_template = "custom_create.html"
     edit_template = "custom_edit.html"
@@ -59,7 +59,6 @@ class RollingStockAdmin(BaseModelView, model=RollingStock):
     column_list = _shared_columns
     column_details_list = _shared_columns
 
-    # ДОБАВЛЯЕМ: Форматирование колонки в виде ссылки на кастомную аналитику
     column_formatters = {
         RollingStock.inventory_number: lambda m, a: Markup(
             f'<a href="/admin/dashboard/train/{m.id}" class="fw-bold text-decoration-none">{m.inventory_number}</a>'
@@ -73,25 +72,20 @@ class RollingStockAdmin(BaseModelView, model=RollingStock):
     form_excluded_columns = ["repair_tasks"]
 
     async def insert_model(self, request: Request, data: dict) -> Any:
-        """Перехват создания нового МВПС для проверки через Pydantic схему и сервис"""
+        """Создание МВПС через сервис"""
         async with DBManager(session_factory=async_session_maker) as db:
             service = RollingStockService(db)
             try:
-                # Проверяем входные данные через Pydantic (сработает ограничение max_length=10)
                 create_schema = RollingStockCreate(**data)
-
-                # Передаем валидированную схему в сервис (там же отработает проверка уникальности номера)
                 return await service.create_train(create_schema)
 
             except ValidationError as e:
-                # Извлекаем понятное сообщение об ошибке валидации первого не прошедшего поля
                 error_detail = e.errors()[0]['msg']
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Ошибка валидации полей: {error_detail}"
                 )
             except HTTPException as e:
-                # Пробрасываем кастомные ошибки из сервиса (например, 400 "МВПС с таким номером уже существует")
                 raise HTTPException(
                     status_code=e.status_code,
                     detail=e.detail
@@ -103,13 +97,11 @@ class RollingStockAdmin(BaseModelView, model=RollingStock):
                 )
 
     async def update_model(self, request: Request, data: dict, model: Any) -> Any:
-        """Перехват редактирования МВПС для валидации изменений"""
+        """Редактирование МВПС через сервис"""
         async with DBManager(session_factory=async_session_maker) as db:
             service = RollingStockService(db)
             try:
-                # Проверяем измененные поля через схему обновления
                 update_schema = RollingStockUpdate(**data)
-
                 return await service.update_train(model.id, update_schema)
 
             except ValidationError as e:
@@ -170,11 +162,10 @@ class CreateRegulationAdminView(BaseView):
     @expose("/create-regulation", methods=["GET"])
     async def create_regulation_page(self, request: Request):
         async with DBManager(session_factory=async_session_maker) as db:
-            # Получаем только существующие и уникальные серии поездов
+
             trains_query = select(RollingStock.series).distinct()
             train_series = (await db.session.execute(trains_query)).scalars().all()
 
-            # Достаем доступные типы ремонта из нашего Enum
             repair_types = [rt.value for rt in RepairTypeEnum]
 
             return await self.templates.TemplateResponse(
@@ -193,15 +184,11 @@ class CreateRegulationAdminView(BaseView):
         form = await request.form()
 
         try:
-            # Парсим динамические этапы из формы
             templates = []
 
-            # Выделяем все ключи формы, относящиеся к этапам
             template_keys = [k for k in form.keys() if k.startswith("template_name_")]
-            # Сортируем по суффиксу-индексу, чтобы гарантировать порядок
             template_keys.sort(key=lambda x: int(x.split("_")[-1]))
 
-            # enumerate с 1 обеспечивает строгое соответствие валидатору order_number в Pydantic
             for i, key in enumerate(template_keys, start=1):
                 name = form.get(key)
                 if name and name.strip():
@@ -212,7 +199,6 @@ class CreateRegulationAdminView(BaseView):
             if not templates:
                 raise ValueError("Необходимо добавить хотя бы один этап ремонта.")
 
-            # Собираем Pydantic схему
             reg_in = RegulationCreate(
                 repair_type=form.get("repair_type"),
                 train_series=form.get("train_series"),
@@ -221,7 +207,6 @@ class CreateRegulationAdminView(BaseView):
                 templates=templates
             )
 
-            # Передаем схему в уже написанный сервисный слой
             async with DBManager(session_factory=async_session_maker) as db:
                 service = RegulationService(db)
                 await service.create(reg_in)
@@ -229,7 +214,6 @@ class CreateRegulationAdminView(BaseView):
             return RedirectResponse(url="/admin/dashboard", status_code=303)
 
         except Exception as e:
-            # Ловим ошибки бизнес-логики (например, дубликаты)
             error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
             return RedirectResponse(url=f"/admin/create-regulation?error={error_msg}", status_code=303)
 
@@ -283,16 +267,11 @@ class WorkBrigadeAdmin(BaseModelView, model=WorkBrigade):
     form_excluded_columns = [WorkBrigade.stages, WorkBrigade.repair_tasks]
 
     async def insert_model(self, request: Request, data: dict) -> Any:
-        """Перехват создания новой бригады"""
+        """Создание бригады через сервис"""
         async with DBManager(session_factory=async_session_maker) as db:
-            # Создаем сервис (инженера), передаем ему базу
             service = BrigadeService(db)
             try:
-                # ИСПОЛЬЗУЕМ СХЕМУ (фильтр) для проверки данных
-                # Тут должно быть имя Pydantic класса: WorkBrigadeCreate
                 create_schema = WorkBrigadeCreate(**data)
-
-                # Передаем УЖЕ ПРОВЕРЕННУЮ схему в сервис
                 return await service.create(create_schema)
 
             except (ValidationError, ValueError, HTTPException) as e:
@@ -303,11 +282,10 @@ class WorkBrigadeAdmin(BaseModelView, model=WorkBrigade):
                 )
 
     async def update_model(self, request: Request, data: dict, model: Any) -> Any:
-        """Перехват изменения существующей бригады"""
+        """Изменение бригады через сервис"""
         async with DBManager(session_factory=async_session_maker) as db:
             service = BrigadeService(db)
             try:
-                # ИСПОЛЬЗУЕМ СХЕМУ ОБНОВЛЕНИЯ: WorkBrigadeUpdate
                 update_schema = WorkBrigadeUpdate(**data)
 
                 return await service.update(model.id, update_schema)
@@ -333,7 +311,6 @@ class RepairTaskAdmin(BaseModelView, model=RepairTask):
 
     list_template = "admin_task_list.html"
 
-    # Для общей таблицы
     column_list = [
         RepairTask.id,
         RepairTask.rolling_stock,
@@ -344,7 +321,6 @@ class RepairTaskAdmin(BaseModelView, model=RepairTask):
         RepairTask.planned_end_date
     ]
 
-    # Перевод названий колонок
     column_labels = {
         "id": "ID",
         "rolling_stock": "Серия МВПС",
@@ -359,33 +335,27 @@ class RepairTaskAdmin(BaseModelView, model=RepairTask):
         "formatted_paused_time": "Суммарное время пауз"
     }
 
-    # Форматирование дат и статусов
-
     _shared_formatters = {
         RepairTask.status: lambda m, a: TASK_STATUS_TRANSLATE.get(
             m.status.name if hasattr(m.status, 'name') else str(m.status),
             str(m.status)
         ),
-        RepairTask.start_date: lambda m, a: m.start_date.strftime("%d.%m.%Y %H:%M") if getattr(m, 'start_date',
-                                                                                               None) else "—",
+        RepairTask.start_date:
+            lambda m, a: m.start_date.strftime("%d.%m.%Y %H:%M") if getattr(m, 'start_date', None) else "—",
 
-        # Передаем вычисляемое свойство как СТРОКУ!
-        "baseline_end_date": lambda m, a: m.baseline_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m,
-                                                                                                    'baseline_end_date',
-                                                                                                    None) else "—",
+        "baseline_end_date":
+            lambda m, a: m.baseline_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m, 'baseline_end_date', None) else "—",
 
-        RepairTask.planned_end_date: lambda m, a: m.planned_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m,
-                                                                                                           'planned_end_date',
-                                                                                                           None) else "—",
-        RepairTask.actual_end_date: lambda m, a: m.actual_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m,
-                                                                                                         'actual_end_date',
-                                                                                                         None) else "—",
+        RepairTask.planned_end_date:
+            lambda m, a: m.planned_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m, 'planned_end_date', None) else "—",
+
+        RepairTask.actual_end_date:
+            lambda m, a: m.actual_end_date.strftime("%d.%m.%Y %H:%M") if getattr(m, 'actual_end_date', None) else "—",
     }
 
     column_formatters = _shared_formatters
     column_formatters_detail = _shared_formatters
 
-    # Для детального просмотра
     column_details_list = [
         RepairTask.id,
         RepairTask.rolling_stock,
@@ -394,7 +364,6 @@ class RepairTaskAdmin(BaseModelView, model=RepairTask):
         RepairTask.status,
         RepairTask.start_date,
 
-        # Передаем вычисляемые свойства как СТРОКИ!
         "baseline_end_date",
         "formatted_paused_time",
 
@@ -429,7 +398,6 @@ class RepairStageAdmin(BaseModelView, model=RepairStage):
     can_edit = False
 
 
-
 class DashboardView(BaseView):
     name = "Дашборд"
     icon = "fa-solid fa-chart-pie"
@@ -439,13 +407,11 @@ class DashboardView(BaseView):
         planning_data = []
         planned_30_days_count = 0
 
-        # Переменные для блока "Контроль"
         in_progress_count = 0
         paused_count = 0
         overdue_tasks_count = 0
         active_tasks_data = []
 
-        # Данные для кольцевой диаграммы (Срез статусов в цеху)
         status_distribution = {
             "Создано": 0,
             "В работе": 0,
@@ -456,7 +422,7 @@ class DashboardView(BaseView):
         async with DBManager(session_factory=async_session_maker) as db:
             service = PlanningService(db)
 
-            # --- БЛОК ПЛАНИРОВАНИЯ ---
+            # ПЛАНИРОВАНИЕ
             trains_query = select(RollingStock)
             trains = (await db.session.execute(trains_query)).scalars().all()
             total_trains = len(trains)
@@ -465,12 +431,11 @@ class DashboardView(BaseView):
                 plan_info = await service.get_train_planning_status(train.id)
                 if plan_info and plan_info["planning"]:
                     planning_data.append(plan_info)
-                    # Считаем, сколько ремонтов предстоит в ближайший месяц
                     for p in plan_info["planning"]:
                         if 0 <= p["days_remaining"] <= 30:
                             planned_30_days_count += 1
 
-            # --- БЛОК КОНТРОЛЯ ---
+            # КОНТРОЛЬ
             active_tasks_query = (
                 select(RepairTask)
                 .where(RepairTask.status != TaskStatusEnum.COMPLETED)
@@ -482,7 +447,6 @@ class DashboardView(BaseView):
             now = datetime.now(timezone.utc)
 
             for task in active_tasks:
-                # Считаем статистику для графика
                 status_val = task.status.value
                 if status_val in status_distribution:
                     status_distribution[status_val] += 1
@@ -492,7 +456,6 @@ class DashboardView(BaseView):
                 elif task.status in [TaskStatusEnum.PAUSED, TaskStatusEnum.WAITING_PARTS]:
                     paused_count += 1
 
-                # Проверяем на просрочку
                 is_task_overdue = False
                 if task.planned_end_date and task.planned_end_date < now:
                     is_task_overdue = True
@@ -503,7 +466,6 @@ class DashboardView(BaseView):
                     "is_task_overdue": is_task_overdue
                 })
 
-            # Упаковываем в JSON только те статусы, где значение > 0 (чтобы график был чистым)
             filtered_labels = [k for k, v in status_distribution.items() if v > 0]
             filtered_values = [v for k, v in status_distribution.items() if v > 0]
 
@@ -535,7 +497,7 @@ class DashboardView(BaseView):
             service = RepairTaskService(db)
             try:
                 task = await service.get_full_task(int(task_id))
-                brigades = await db.brigades.get_all()  # Оставляем для доп. бригад
+                brigades = await db.brigades.get_all()
 
                 return await self.templates.TemplateResponse(
                     request,
@@ -547,7 +509,6 @@ class DashboardView(BaseView):
                     }
                 )
             except Exception as e:
-                # Добавим вывод в консоль бэкенда, чтобы локализовать сбой, если он будет
                 print(f"Ошибка при рендере деталей задачи: {str(e)}")
                 return RedirectResponse(url="/admin/dashboard?error=Error loading task", status_code=303)
 
@@ -557,16 +518,16 @@ class DashboardView(BaseView):
         train_id = request.path_params.get("train_id")
 
         async with DBManager(session_factory=async_session_maker) as db:
-            # 1. Получаем общую информацию о составе
+            # Получаем общую информацию о составе
             train = await db.trains.get_by_id(int(train_id))
             if not train:
                 return RedirectResponse(url="/admin/dashboard?error=Train not found", status_code=303)
 
-            # 2. Вызываем существующий сервис планирования для расчета периодов и просрочек
+            # Вызываем сервис планирования для расчета периодов и просрочек
             planning_service = PlanningService(db)
             plan_info = await planning_service.get_train_planning_status(train.id)
 
-            # 3. Извлекаем историю всех успешно выполненных ремонтов (Архив)
+            # Извлекаем историю всех успешно выполненных ремонтов
             history_query = (
                 select(RepairTask)
                 .where(
@@ -578,7 +539,7 @@ class DashboardView(BaseView):
             )
             history_tasks = (await db.session.execute(history_query)).scalars().all()
 
-            # 4. Проверяем, есть ли по составу текущие активные ремонтные задания
+            # Проверяем, есть ли по составу текущие активные ремонтные задания
             active_query = (
                 select(RepairTask)
                 .where(
@@ -610,7 +571,6 @@ class DashboardView(BaseView):
         async with DBManager(session_factory=async_session_maker) as db:
             service = PlanningService(db)
 
-            # Получаем все поезда
             trains_query = select(RollingStock)
             trains = (await db.session.execute(trains_query)).scalars().all()
 
@@ -629,7 +589,6 @@ class DashboardView(BaseView):
                             "is_overdue": p["is_overdue"]
                         })
 
-            # Сортируем: сначала самые просроченные, затем идущие по графику
             all_upcoming.sort(key=lambda x: x["days_remaining"])
 
             return await self.templates.TemplateResponse(
@@ -659,7 +618,6 @@ class CreateTaskAdminView(BaseView):
             trains = (await db.session.execute(trains_query)).scalars().all()
             brigades = (await db.session.execute(brigades_query)).scalars().all()
 
-            # ВАЖНО: Рендерим шаблон прямо здесь, не выходя из блока with
             return await self.templates.TemplateResponse(
                 request,
                 "admin_create_task.html",
@@ -667,7 +625,7 @@ class CreateTaskAdminView(BaseView):
                     "request": request,
                     "trains": trains,
                     "brigades": brigades,
-                    "error": request.query_params.get("error")  # Для вывода ошибок
+                    "error": request.query_params.get("error")
                 }
             )
 
@@ -676,23 +634,19 @@ class CreateTaskAdminView(BaseView):
         form = await request.form()
 
         try:
-            # Собираем данные из HTML-формы в нашу Pydantic схему
             task_in = RepairTaskCreate(
                 rolling_stock_id=int(form.get("rolling_stock_id")),
                 repair_type=form.get("repair_type"),
                 brigade_id=int(form.get("brigade_id"))
             )
 
-            # Вызываем сервис, который сделает всю магию с этапами
             async with DBManager(session_factory=async_session_maker) as db:
                 service = RepairTaskService(db)
                 await service.create_task(task_in)
 
-            # Если всё ок - редиректим на список задач в админке
             return RedirectResponse(url="/admin/dashboard", status_code=303)
 
         except Exception as e:
-            # Если ошибка (например, нет регламента) - возвращаем обратно с текстом ошибки
             error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
             return RedirectResponse(url=f"/admin/create-task?error={error_msg}", status_code=303)
 
@@ -706,7 +660,6 @@ class ArchiveView(BaseView):
         search = request.query_params.get("search", "").strip()
 
         async with DBManager(session_factory=async_session_maker) as db:
-            # Делаем JOIN с RollingStock, чтобы можно было искать по его полям
             query = (
                 select(RepairTask)
                 .join(RollingStock, RepairTask.rolling_stock_id == RollingStock.id)
@@ -717,7 +670,6 @@ class ArchiveView(BaseView):
                 )
             )
 
-            # Если есть запрос, фильтруем по серии ИЛИ инвентарному номеру
             if search:
                 query = query.where(
                     or_(
@@ -735,7 +687,7 @@ class ArchiveView(BaseView):
                 context={
                     "request": request,
                     "tasks": completed_tasks,
-                    "search_query": search  # Передаем строку поиска в шаблон
+                    "search_query": search
                 }
             )
 
@@ -750,7 +702,6 @@ class UserAdmin(BaseModelView, model=User):
         "hashed_password": "Пароль"
     }
 
-    # Железобетонное переопределение поля в WTForms
     form_overrides = {
         "role": SelectField
     }

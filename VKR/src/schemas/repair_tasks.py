@@ -20,7 +20,7 @@ class RepairTaskResponse(RepairTaskBase):
     rolling_stock_id: int
     train_series: str
     brigade_id: Optional[int] = None
-    master_name_snapshot: Optional[str] = "Не указан"  # Для старых записей
+    master_name_snapshot: Optional[str] = "Не указан"
     status: TaskStatusEnum
     start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
