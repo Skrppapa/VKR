@@ -25,7 +25,8 @@ from src.sql_admin.admin import (RollingStockAdmin,
                                  DashboardView,
                                  CreateTaskAdminView,
                                  CreateRegulationAdminView,
-                                 ArchiveView)
+                                 ArchiveView,
+                                 UserAdmin)
 
 
 app = FastAPI(
@@ -87,6 +88,8 @@ admin.add_view(RegulationAdmin)
 admin.add_view(PartAndMaterialAdmin)
 admin.add_view(WorkBrigadeAdmin)
 admin.add_view(RepairTaskAdmin)
+admin.add_view(UserAdmin)
+
 
 
 

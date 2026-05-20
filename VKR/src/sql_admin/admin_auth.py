@@ -14,8 +14,12 @@ class AdminAuth(AuthenticationBackend):
             query = select(User).where(User.username == username)
             user = (await session.execute(query)).scalar_one_or_none()
 
-            # Если пользователя нет или пароль не совпадает
+            # Проверяем существование пользователя и совпадение пароля
             if not user or not verify_password(password, user.hashed_password):
+                return False
+
+            # Строгая проверка роли: только admin имеет доступ к SqlAdmin
+            if user.role != "admin":
                 return False
 
             # Если всё ок — генерируем токен и кладем в сессию браузера
@@ -25,12 +29,10 @@ class AdminAuth(AuthenticationBackend):
         return True
 
     async def logout(self, request: Request) -> bool:
-        # При выходе очищаем сессию
         request.session.clear()
         return True
 
     async def authenticate(self, request: Request) -> bool:
-        # Проверяем, есть ли у пользователя токен в сессии при переходе на любую страницу админки
         token = request.session.get("token")
         if not token:
             return False

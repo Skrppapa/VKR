@@ -23,6 +23,9 @@ from src.services.catalogs import RegulationService
 from src.services.catalogs import BrigadeService
 from src.schemas.work_brigades import WorkBrigadeCreate, WorkBrigadeUpdate
 from markupsafe import Markup
+from src.models.users import User
+from src.security import get_password_hash
+from wtforms.fields import SelectField
 
 
 
@@ -735,3 +738,46 @@ class ArchiveView(BaseView):
                     "search_query": search  # Передаем строку поиска в шаблон
                 }
             )
+
+
+class UserAdmin(BaseModelView, model=User):
+    column_list = [User.id, User.username, User.role]
+
+    column_labels = {
+        "id": "ID",
+        "username": "Логин",
+        "role": "Роль",
+        "hashed_password": "Пароль"
+    }
+
+    # Железобетонное переопределение поля в WTForms
+    form_overrides = {
+        "role": SelectField
+    }
+
+    form_args = {
+        "role": {
+            "choices": [
+                ("master", "Мастер"),
+                ("engineer", "Инженер"),
+                ("admin", "Администратор")
+            ]
+        }
+    }
+
+    name = "Пользователь"
+    name_plural = "Пользователи"
+    icon = "fa-solid fa-user"
+    column_searchable_list = [User.username]
+
+    async def insert_model(self, request: Request, data: dict) -> Any:
+        raw_password = data.get("hashed_password")
+        if raw_password:
+            data["hashed_password"] = get_password_hash(raw_password)
+        return await super().insert_model(request, data)
+
+    async def update_model(self, request: Request, data: dict, model: Any) -> Any:
+        raw_password = data.get("hashed_password")
+        if raw_password and not raw_password.startswith("$2b$"):
+            data["hashed_password"] = get_password_hash(raw_password)
+        return await super().update_model(request, data, model)

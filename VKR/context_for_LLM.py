@@ -19,6 +19,8 @@ TARGET_DIRS = [
     "templates/admin_regulation_list.html",
     "templates/admin_task_details.html",
     "templates/admin_task_list.html",
+    "templates/admin_train_details.html",
+    "templates/admin_upcoming_repairs.html",
     "templates/base.html",
     "templates/custom_create.html",
     "templates/custom_details.html",
