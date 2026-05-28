@@ -1,7 +1,5 @@
 import enum
 
-# Справочники: Виды ремонта, Статусы задач и стадий ремонта
-
 class RepairTypeEnum(str, enum.Enum):
     TO1 = "ТО-1"
     TO2 = "ТО-2"
@@ -17,6 +15,7 @@ class TaskStatusEnum(str, enum.Enum):
     IN_PROGRESS = "В работе"
     WAITING_PARTS = "Ожидание запчастей"
     PAUSED = "Пауза"
+    PENDING_CLOSURE = "Ожидает закрытия"
     COMPLETED = "Завершено"
 
 class StageStatusEnum(str, enum.Enum):

@@ -416,7 +416,8 @@ class DashboardView(BaseView):
             "Создано": 0,
             "В работе": 0,
             "Пауза": 0,
-            "Ожидание запчастей": 0
+            "Ожидание запчастей": 0,
+            "Ожидает закрытия": 0
         }
 
         async with DBManager(session_factory=async_session_maker) as db:
@@ -563,6 +564,39 @@ class DashboardView(BaseView):
                     "total_completed": len(history_tasks)
                 }
             )
+
+    @expose("/dashboard/task/{task_id}/reject", methods=["POST"])
+    async def reject_task_action(self, request: Request):
+        task_id = request.path_params.get("task_id")
+        form = await request.form()
+        comment = form.get("comment")
+
+        async with DBManager(session_factory=async_session_maker) as db:
+            service = RepairTaskService(db)
+            try:
+                await service.reject_closure(int(task_id), comment)
+            except Exception as e:
+                # Если будет ошибка бизнес-логики, вернем на дашборд с пометкой
+                error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
+                return RedirectResponse(url=f"/admin/dashboard?error={error_msg}", status_code=303)
+
+        # При успешном отклонении возвращаем диспетчера обратно в карточку задания
+        return RedirectResponse(url=f"/admin/dashboard/task/{task_id}", status_code=303)
+
+    @expose("/dashboard/task/{task_id}/approve", methods=["POST"])
+    async def approve_task_action(self, request: Request):
+        task_id = request.path_params.get("task_id")
+
+        async with DBManager(session_factory=async_session_maker) as db:
+            service = RepairTaskService(db)
+            try:
+                await service.approve_closure(int(task_id))
+            except Exception as e:
+                error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
+                return RedirectResponse(url=f"/admin/dashboard?error={error_msg}", status_code=303)
+
+        # При успешном принятии логично отправить диспетчера в архив (так как задача завершена)
+        return RedirectResponse(url="/admin/archive", status_code=303)
 
     @expose("/dashboard/upcoming-repairs", methods=["GET"])
     async def upcoming_repairs(self, request: Request):

@@ -1,8 +1,11 @@
 import sys
+import os
 import uvicorn
 from fastapi import FastAPI, Depends, Request
+from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
+
 
 from src.api.rolling_stock import router as rolling_stock_router
 from src.api.catalogs import router as catalogs_router
@@ -34,6 +37,10 @@ app = FastAPI(
     description="API для планирования и контроля ремонта подвижного состава",
     version="1.0.0"
 )
+
+os.makedirs("media/docs", exist_ok=True)
+
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 @app.middleware("http")

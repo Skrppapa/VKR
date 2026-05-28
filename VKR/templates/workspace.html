@@ -92,6 +92,7 @@
                 let badgeClass = '';
                 if (task.status === 'В работе') badgeClass = 'in-progress';
                 if (task.status === 'Пауза' || task.status === 'Ожидание запчастей') badgeClass = 'paused';
+                if (task.status === 'Ожидает закрытия') badgeClass = 'paused';
 
                 card.innerHTML = `
                     <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -137,9 +138,9 @@
                 // Вывод комментария/заявки мастера
                 if (stage.pause_reason) {
                     if (stage.status === 'Ожидание запчастей') {
-                        commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #af52de;">🛒 Заявка на склад: ${stage.pause_reason}</div>`;
+                        commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #af52de;">Заявка на склад: ${stage.pause_reason}</div>`;
                     } else if (stage.status === 'Пауза') {
-                        commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #ff9f0a;">⏸ Причина паузы: ${stage.pause_reason}</div>`;
+                        commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #ff9f0a;">Причина паузы: ${stage.pause_reason}</div>`;
                     }
                 }
 
@@ -169,7 +170,7 @@
                 // Отображение использованных деталей
                 let partsHtml = '';
                 if (stage.part_associations && stage.part_associations.length > 0) {
-                    partsHtml = '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #86868b;">🛠 Использовано: ';
+                    partsHtml = '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #86868b;">Использовано: ';
                     const partsList = stage.part_associations.map(pa => `${pa.part.nomenclature} (${pa.quantity_used} шт.)`);
                     partsHtml += partsList.join(', ') + '</div>';
                 }
@@ -190,6 +191,40 @@
             });
 
             stagesHtml += '</div>';
+
+            const allCompleted = taskData.stages.every(s => s.status === 'Завершено');
+
+            if (taskData.status === 'Ожидает закрытия') {
+                stagesHtml += `
+                <div style="margin-top: 1.5rem; padding: 1rem; background-color: #e5f0ff; border-radius: 8px; color: #004085;">
+                    <strong style="display:block; margin-bottom: 0.5rem;">⏳ Ожидает проверки</strong>
+                    Задание отправлено на проверку диспетчеру. Ожидайте подтверждения.
+                </div>`;
+            } else if (allCompleted && taskData.status !== 'Завершено') {
+                stagesHtml += `
+                <div style="margin-top: 1rem; padding: 1.25rem; border: 1px solid #e5e5ea; border-radius: 14px; background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+                    <div style="margin-bottom: 0.75rem;">
+                        <strong style="font-size: 0.95rem; color: #1d1d1f; display: block; letter-spacing: -0.01em;">Завершение ремонта</strong>
+                        <span style="font-size: 0.8rem; color: #86868b;">Прикрепите скан-копию акта (PDF, JPG)</span>
+                    </div>
+                    <form id="closure-form-${taskId}" onsubmit="event.preventDefault(); submitForClosure(${taskId});" style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0;">
+                        <input type="file" id="act_file_${taskId}" name="file" accept=".pdf, .jpg, .png" required
+                               style="flex-grow: 1; font-size: 0.8rem; padding: 0.35rem 0.5rem; border: 1px solid #d2d2d7; border-radius: 8px; color: #1d1d1f; background: #fbfbfd; margin: 0; cursor: pointer;">
+                        <button type="submit" style="margin: 0; padding: 0.35rem 1rem; font-size: 0.85rem; border-radius: 8px; border: none; background-color: #007aff; color: #ffffff; cursor: pointer; white-space: nowrap; font-weight: 500;">
+                            Отправить
+                        </button>
+                    </form>
+                </div>`;
+            }
+
+            // Вывод комментария проверяющего при отклонении
+            if (taskData.inspector_comment) {
+                 stagesHtml += `
+                 <div style="margin-top: 1rem; padding: 1rem; background-color: #ffe5e5; border-radius: 8px; color: #d70015; font-size: 0.9rem;">
+                     <strong>Отклонено диспетчером:</strong> ${taskData.inspector_comment}
+                 </div>`;
+            }
+
             container.innerHTML = stagesHtml;
         } catch (e) {
             container.innerHTML = '<small style="color:red;">Ошибка загрузки этапов</small>';
@@ -300,6 +335,38 @@
 
         } catch (e) {
             alert("Ошибка соединения с сервером");
+        }
+    }
+
+  // --- 6. ОТПРАВКА ЗАДАНИЯ НА ЗАКРЫТИЕ ---
+    async function submitForClosure(taskId) {
+        const fileInput = document.getElementById(`act_file_${taskId}`);
+        if (!fileInput.files.length) {
+            alert("Пожалуйста, выберите файл акта.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        try {
+            // Обрати внимание: мы НЕ передаем Content-Type.
+            // Браузер сам выставит multipart/form-data и добавит boundary.
+            const response = await fetchWithAuth(`${API_BASE}/repair-tasks/${taskId}/submit-closure`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                alert("Ошибка отправки: " + (err.detail || "Сбой на сервере"));
+                return;
+            }
+
+            await loadStages(taskId);
+            loadActiveTasks();
+        } catch (e) {
+            alert("Ошибка сети при отправке файла");
         }
     }
 </script>

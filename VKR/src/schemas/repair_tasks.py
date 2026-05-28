@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer, Field
 from src.models.enums import RepairTypeEnum, TaskStatusEnum
 from src.schemas.repair_stages import RepairStageResponse
 
@@ -26,6 +26,8 @@ class RepairTaskResponse(RepairTaskBase):
     planned_end_date: Optional[datetime] = None
     actual_end_date: Optional[datetime] = None
     total_paused_seconds: int = 0
+    closure_document_path: Optional[str] = None
+    inspector_comment: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,7 +37,8 @@ class RepairTaskResponse(RepairTaskBase):
             return dt.strftime('%d.%m.%Y %H:%M')
         return None
 
+class RejectTaskSchema(BaseModel):
+    comment: str = Field(..., min_length=5, description="Причина отклонения работы")
 
-# Расширенный ответ (например, когда запрашивают конкретное задание по ID)
 class RepairTaskWithStagesResponse(RepairTaskResponse):
     stages: List[RepairStageResponse] = []

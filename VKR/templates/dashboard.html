@@ -114,7 +114,8 @@
                                     'Создано': 'bg-secondary',
                                     'В работе': 'bg-success',
                                     'Пауза': 'bg-warning text-dark',
-                                    'Ожидание запчастей': 'bg-danger text-white'
+                                    'Ожидание запчастей': 'bg-danger text-white',
+                                    'Ожидает закрытия': 'bg-warning text-dark border border-warning'
                                 } %}
 
                                 {% for item in active_tasks %}
@@ -178,7 +179,8 @@
                     "Создано": "#6c757d",
                     "В работе": "#198754",
                     "Пауза": "#ffc107",
-                    "Ожидание запчастей": "#dc3545"
+                    "Ожидание запчастей": "#dc3545",
+                    "Ожидает закрытия": "#fd7e14"
                 };
 
                 const backgroundColors = chartData.labels.map(label => colorMap[label] || "#adb5bd");

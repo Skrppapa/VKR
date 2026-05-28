@@ -170,11 +170,11 @@ class RepairStageService:
                 stage.start_time = datetime.now(timezone.utc)
             stage.end_time = datetime.now(timezone.utc)
 
-            is_last_stage = (current_index == len(task_stages) - 1)
-            if is_last_stage:
-                log.info(f"Все этапы выполнены. Ремонтное задание ID {task.id} переведено в статус COMPLETED.")
-                task.status = TaskStatusEnum.COMPLETED
-                task.actual_end_date = datetime.now(timezone.utc)
+            # is_last_stage = (current_index == len(task_stages) - 1)
+            # if is_last_stage:
+            #     log.info(f"Все этапы выполнены. Ремонтное задание ID {task.id} переведено в статус COMPLETED.")
+            #     task.status = TaskStatusEnum.COMPLETED
+            #     task.actual_end_date = datetime.now(timezone.utc)
 
         stage.status = new_status
         await self.db.commit()

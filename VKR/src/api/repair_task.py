@@ -1,9 +1,8 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, UploadFile, File
 from typing import List
 from src.api.dependencies import DBDep
 from src.services.repair_tasks import RepairTaskService
-from src.schemas.repair_tasks import RepairTaskCreate, RepairTaskResponse, RepairTaskWithStagesResponse
-
+from src.schemas.repair_tasks import RepairTaskCreate, RepairTaskResponse, RepairTaskWithStagesResponse, RejectTaskSchema
 
 router = APIRouter(prefix="/repair-tasks", tags=["Ремонтные задания"])
 
@@ -36,3 +35,26 @@ async def delete_task(task_id: int, db: DBDep):
     """Удалить задание (Кроме активных и завершенных)"""
     service = RepairTaskService(db)
     await service.delete_task(task_id)
+
+@router.post("/{task_id}/submit-closure", response_model=RepairTaskResponse)
+async def submit_task_for_closure(
+    task_id: int,
+    db: DBDep,
+    file: UploadFile = File(...)
+):
+    """Отправить задание на проверку с документом"""
+    service = RepairTaskService(db)
+    return await service.submit_for_closure(task_id, file)
+
+@router.post("/{task_id}/approve")
+async def approve_task_closure(task_id: int, db: DBDep):
+    """Диспетчер принимает работу"""
+    service = RepairTaskService(db)
+    await service.approve_closure(task_id)
+    return {"detail": "Задание успешно закрыто и переведено в архив"}
+
+@router.post("/{task_id}/reject", response_model=RepairTaskResponse)
+async def reject_task_closure(task_id: int, payload: RejectTaskSchema, db: DBDep):
+    """Диспетчер отклоняет работу"""
+    service = RepairTaskService(db)
+    return await service.reject_closure(task_id, payload.comment)
