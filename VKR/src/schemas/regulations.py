@@ -2,7 +2,7 @@ from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.models.enums import RepairTypeEnum
 
-# Шаблоны
+
 class RegulationTemplateBase(BaseModel):
     name: str = Field(..., description="Название этапа (например, Диагностика)")
     order_number: int = Field(..., gt=0, description="Порядковый номер выполнения")
@@ -16,7 +16,6 @@ class RegulationTemplateResponse(RegulationTemplateBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Регламенты
 class RegulationBase(BaseModel):
     repair_type: RepairTypeEnum = Field(..., description="Вид ремонта")
     train_series: str = Field(..., max_length=50, description="Серия поезда")

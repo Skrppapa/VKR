@@ -12,7 +12,6 @@ class RollingStock(Base):
     inventory_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     series: Mapped[str] = mapped_column(String(50))
     manufacture_date: Mapped[date] = mapped_column(Date)
-
     repair_tasks: Mapped[list["RepairTask"]] = relationship(back_populates="rolling_stock")
 
     def __str__(self):

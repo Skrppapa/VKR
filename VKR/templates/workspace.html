@@ -41,7 +41,6 @@
 <script>
     const API_BASE = '/api/v1';
 
-    // --- ЛОГИКА АВТОРИЗАЦИИ ---
     const token = localStorage.getItem('access_token');
     if (!token) {
         window.location.href = '/login';
@@ -69,7 +68,6 @@
 
     document.addEventListener('DOMContentLoaded', loadActiveTasks);
 
-    // --- 1. ЗАГРУЗКА ЗАДАНИЙ ---
     async function loadActiveTasks() {
         const container = document.getElementById('tasks-container');
         try {
@@ -120,7 +118,6 @@
         }
     }
 
-    // --- 2. ЗАГРУЗКА ЭТАПОВ ---
     async function loadStages(taskId) {
         const container = document.getElementById(`stages-container-${taskId}`);
         try {
@@ -135,7 +132,6 @@
                 let rowClass = 'stage-row';
                 let commentHtml = '';
 
-                // Вывод комментария/заявки мастера
                 if (stage.pause_reason) {
                     if (stage.status === 'Ожидание запчастей') {
                         commentHtml = `<div style="margin-top: 0.3rem; font-size: 0.8rem; color: #af52de;">Заявка на склад: ${stage.pause_reason}</div>`;
@@ -154,7 +150,6 @@
                     `;
                 } else if (stage.status === 'Ожидание запчастей') {
                     rowClass += ' paused';
-                    // ДОБАВЛЕНО: Гибридная система для мастера
                     actionsHtml = `
                         <button style="background: #af52de; border-color: #af52de; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="openPartModal(${stage.id}, ${taskId})">+ Взять со склада</button>
                         <button class="outline" style="color: #ff3b30; border-color: #ff3b30; padding: 0.2rem 0.6rem; font-size: 0.8rem; margin:0; margin-right: 0.5rem;" onclick="orderPartsToDispatcher(${stage.id}, ${taskId})">Заказать диспетчеру</button>
@@ -167,7 +162,6 @@
                     rowClass += ' completed';
                 }
 
-                // Отображение использованных деталей
                 let partsHtml = '';
                 if (stage.part_associations && stage.part_associations.length > 0) {
                     partsHtml = '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #86868b;">Использовано: ';
@@ -217,7 +211,6 @@
                 </div>`;
             }
 
-            // Вывод комментария проверяющего при отклонении
             if (taskData.inspector_comment) {
                  stagesHtml += `
                  <div style="margin-top: 1rem; padding: 1rem; background-color: #ffe5e5; border-radius: 8px; color: #d70015; font-size: 0.9rem;">
@@ -231,7 +224,6 @@
         }
     }
 
-    // --- 3. ИЗМЕНЕНИЕ СТАТУСА ---
     async function changeStageStatus(stageId, newStatus, taskId) {
         let reason = null;
         if (newStatus === 'Пауза') {
@@ -258,13 +250,11 @@
         }
     }
 
-    // --- 4. ЗАКАЗ ДЕТАЛЕЙ ДИСПЕТЧЕРУ ---
     async function orderPartsToDispatcher(stageId, taskId) {
         const reason = prompt("Заявка на склад. Опишите, какие детали необходимы для работы:");
         if (!reason) return;
 
         try {
-            // Отправляем PATCH с текстом заявки (статус остается тем же)
             const response = await fetchWithAuth(`${API_BASE}/repair-stages/${stageId}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -282,7 +272,6 @@
         }
     }
 
-    // --- 5. ЛОГИКА МОДАЛЬНОГО ОКНА ДЛЯ САМОСТОЯТЕЛЬНОГО СПИСАНИЯ ---
     async function openPartModal(stageId, taskId) {
         currentModalStageId = stageId;
         currentModalTaskId = taskId;
@@ -338,7 +327,6 @@
         }
     }
 
-  // --- 6. ОТПРАВКА ЗАДАНИЯ НА ЗАКРЫТИЕ ---
     async function submitForClosure(taskId) {
         const fileInput = document.getElementById(`act_file_${taskId}`);
         if (!fileInput.files.length) {
@@ -350,8 +338,6 @@
         formData.append("file", fileInput.files[0]);
 
         try {
-            // Обрати внимание: мы НЕ передаем Content-Type.
-            // Браузер сам выставит multipart/form-data и добавит boundary.
             const response = await fetchWithAuth(`${API_BASE}/repair-tasks/${taskId}/submit-closure`, {
                 method: 'POST',
                 body: formData

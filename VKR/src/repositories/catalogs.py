@@ -12,7 +12,6 @@ from src.schemas.regulations import RegulationCreate, RegulationUpdate
 from src.schemas.work_brigades import WorkBrigadeCreate, WorkBrigadeUpdate
 
 
-
 class PartRepository(BaseRepository[PartAndMaterial, PartAndMaterialCreate, PartAndMaterialUpdate]):
     def __init__(self, session: AsyncSession):
         super().__init__(PartAndMaterial, session)
@@ -84,3 +83,5 @@ class RegulationRepository(BaseRepository[Regulation, RegulationCreate, Regulati
         query = select(self.model).where(self.model.train_series == train_series)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+

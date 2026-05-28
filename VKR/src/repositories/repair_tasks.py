@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from src.models.enums import TaskStatusEnum
@@ -7,6 +7,7 @@ from datetime import datetime
 from src.repositories.base import BaseRepository
 from src.models.repair_tasks import RepairTask
 from src.models.repair_stages import RepairStage
+from src.models.rolling_stocks import RollingStock
 from src.models.stage_parts import StagePart
 from src.schemas.repair_tasks import RepairTaskCreate, TaskStatusPatch
 
@@ -21,9 +22,11 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
             select(self.model)
             .where(self.model.status != TaskStatusEnum.COMPLETED)
             .options(selectinload(self.model.rolling_stock))
+            .order_by(self.model.start_date.desc())
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
 
     async def get_full_task_graph(self, task_id: int) -> Optional[RepairTask]:
         """Достать задание со всеми этапами, бригадами и деталями"""
@@ -50,11 +53,27 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_archived_tasks(self, skip: int = 0, limit: int = 100) -> list[RepairTask]:
+    async def get_archived_tasks(self, skip: int = 0, limit: int = 100, search: str = "") -> list[RepairTask]:
         """Получить завершенные задания (Архив)"""
-        query = select(self.model).where(
-            self.model.status == TaskStatusEnum.COMPLETED
-        ).offset(skip).limit(limit)
+        query = (
+            select(self.model)
+            .join(RollingStock, self.model.rolling_stock_id == RollingStock.id)
+            .where(self.model.status == TaskStatusEnum.COMPLETED)
+            .options(
+                selectinload(self.model.rolling_stock),
+                selectinload(self.model.brigade)
+            )
+        )
+
+        if search:
+            query = query.where(
+                or_(
+                    RollingStock.series.ilike(f"%{search}%"),
+                    RollingStock.inventory_number.ilike(f"%{search}%")
+                )
+            )
+
+        query = query.order_by(self.model.actual_end_date.desc()).offset(skip).limit(limit)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -80,4 +99,32 @@ class RepairTaskRepository(BaseRepository[RepairTask, RepairTaskCreate, TaskStat
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_history_by_train(self, train_id: int) -> list[RepairTask]:
+        """Получить историю завершенных ремонтов для конкретного МВПС"""
+        query = (
+            select(self.model)
+            .where(
+                self.model.rolling_stock_id == train_id,
+                self.model.status == TaskStatusEnum.COMPLETED
+            )
+            .options(selectinload(self.model.brigade))
+            .order_by(self.model.actual_end_date.desc())
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_active_by_train(self, train_id: int) -> list[RepairTask]:
+        """Получить текущие активные ремонты для конкретного МВПС"""
+        query = (
+            select(self.model)
+            .where(
+                self.model.rolling_stock_id == train_id,
+                self.model.status != TaskStatusEnum.COMPLETED
+            )
+            .options(selectinload(self.model.brigade))
+            .order_by(self.model.start_date.desc())
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
 

@@ -27,7 +27,7 @@ class DBManager:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
-            log.error(f"Сбой транзакции БД: {exc_type.__name__} - {exc_val}")
+            log.error(f"Сбой транзакции: {exc_type.__name__} - {exc_val}")
             log.debug(f"Traceback: {''.join(traceback.format_tb(exc_tb))}")
             await self.session.rollback()
         await self.session.close()

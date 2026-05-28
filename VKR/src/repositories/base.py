@@ -33,7 +33,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         db_obj = self.model(**obj_in_data)
         self.session.add(db_obj)
-        await self.session.flush() # Через flush. Коммит в сервисном слое
+        await self.session.flush()
         return db_obj
 
     async def update(self, db_obj: ModelType, obj_in: UpdateSchemaType | dict[str, Any]) -> ModelType:

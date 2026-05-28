@@ -39,7 +39,6 @@ app = FastAPI(
 )
 
 os.makedirs("media/docs", exist_ok=True)
-
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
@@ -63,11 +62,8 @@ async def log_requests(request: Request, call_next):
 
     return response
 
-#===========Импорты==========
-import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates_path = os.path.join(BASE_DIR, "templates")
-#===========Импорты==========
 
 
 authentication_backend = AdminAuth(secret_key="another-super-secret-key")
@@ -75,7 +71,7 @@ authentication_backend = AdminAuth(secret_key="another-super-secret-key")
 admin = Admin(
     app,
     engine,
-    title="Панель Управления Депо",
+    title="Панель управления депо",
     templates_dir=templates_path,
     authentication_backend=authentication_backend
 )

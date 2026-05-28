@@ -7,12 +7,10 @@ from src.schemas.rolling_stocks import RollingStockUpdate, RollingStockCreate
 from src.services.rolling_stock import RollingStockService
 from src.utils.db_manager import DBManager
 import json
-from sqlalchemy import select, or_
 from src.database import async_session_maker
 from src.services.planning import PlanningService
 from src.models import (RollingStock, Regulation, PartAndMaterial, WorkBrigade, RepairTask, RepairStage)
 from fastapi import Request, HTTPException, status
-from sqlalchemy.orm import selectinload
 from src.models.enums import TaskStatusEnum
 from fastapi.responses import RedirectResponse
 from src.schemas.repair_tasks import RepairTaskCreate
@@ -28,10 +26,7 @@ from src.security import get_password_hash
 from wtforms.fields import SelectField
 
 
-
-
 class BaseModelView(ModelView):
-    """Русификация"""
     list_template = "custom_list.html"
     create_template = "custom_create.html"
     edit_template = "custom_edit.html"
@@ -163,8 +158,7 @@ class CreateRegulationAdminView(BaseView):
     async def create_regulation_page(self, request: Request):
         async with DBManager(session_factory=async_session_maker) as db:
 
-            trains_query = select(RollingStock.series).distinct()
-            train_series = (await db.session.execute(trains_query)).scalars().all()
+            train_series = await db.trains.get_unique_series()
 
             repair_types = [rt.value for rt in RepairTypeEnum]
 
@@ -423,9 +417,7 @@ class DashboardView(BaseView):
         async with DBManager(session_factory=async_session_maker) as db:
             service = PlanningService(db)
 
-            # ПЛАНИРОВАНИЕ
-            trains_query = select(RollingStock)
-            trains = (await db.session.execute(trains_query)).scalars().all()
+            trains = await db.trains.get_all(limit=1000)
             total_trains = len(trains)
 
             for train in trains:
@@ -436,14 +428,7 @@ class DashboardView(BaseView):
                         if 0 <= p["days_remaining"] <= 30:
                             planned_30_days_count += 1
 
-            # КОНТРОЛЬ
-            active_tasks_query = (
-                select(RepairTask)
-                .where(RepairTask.status != TaskStatusEnum.COMPLETED)
-                .options(selectinload(RepairTask.rolling_stock))
-                .order_by(RepairTask.start_date.desc())
-            )
-            active_tasks = (await db.session.execute(active_tasks_query)).scalars().all()
+            active_tasks = await db.tasks.get_active_tasks()
 
             now = datetime.now(timezone.utc)
 
@@ -513,44 +498,20 @@ class DashboardView(BaseView):
                 print(f"Ошибка при рендере деталей задачи: {str(e)}")
                 return RedirectResponse(url="/admin/dashboard?error=Error loading task", status_code=303)
 
-
     @expose("/dashboard/train/{train_id}", methods=["GET"])
     async def train_details(self, request: Request):
         train_id = request.path_params.get("train_id")
 
         async with DBManager(session_factory=async_session_maker) as db:
-            # Получаем общую информацию о составе
             train = await db.trains.get_by_id(int(train_id))
             if not train:
                 return RedirectResponse(url="/admin/dashboard?error=Train not found", status_code=303)
 
-            # Вызываем сервис планирования для расчета периодов и просрочек
             planning_service = PlanningService(db)
             plan_info = await planning_service.get_train_planning_status(train.id)
 
-            # Извлекаем историю всех успешно выполненных ремонтов
-            history_query = (
-                select(RepairTask)
-                .where(
-                    RepairTask.rolling_stock_id == train.id,
-                    RepairTask.status == TaskStatusEnum.COMPLETED
-                )
-                .options(selectinload(RepairTask.brigade))
-                .order_by(RepairTask.actual_end_date.desc())
-            )
-            history_tasks = (await db.session.execute(history_query)).scalars().all()
-
-            # Проверяем, есть ли по составу текущие активные ремонтные задания
-            active_query = (
-                select(RepairTask)
-                .where(
-                    RepairTask.rolling_stock_id == train.id,
-                    RepairTask.status != TaskStatusEnum.COMPLETED
-                )
-                .options(selectinload(RepairTask.brigade))
-                .order_by(RepairTask.start_date.desc())
-            )
-            active_tasks = (await db.session.execute(active_query)).scalars().all()
+            history_tasks = await db.tasks.get_history_by_train(train.id)
+            active_tasks = await db.tasks.get_active_by_train(train.id)
 
             return await self.templates.TemplateResponse(
                 request,
@@ -576,11 +537,9 @@ class DashboardView(BaseView):
             try:
                 await service.reject_closure(int(task_id), comment)
             except Exception as e:
-                # Если будет ошибка бизнес-логики, вернем на дашборд с пометкой
                 error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
                 return RedirectResponse(url=f"/admin/dashboard?error={error_msg}", status_code=303)
 
-        # При успешном отклонении возвращаем диспетчера обратно в карточку задания
         return RedirectResponse(url=f"/admin/dashboard/task/{task_id}", status_code=303)
 
     @expose("/dashboard/task/{task_id}/approve", methods=["POST"])
@@ -595,7 +554,6 @@ class DashboardView(BaseView):
                 error_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
                 return RedirectResponse(url=f"/admin/dashboard?error={error_msg}", status_code=303)
 
-        # При успешном принятии логично отправить диспетчера в архив (так как задача завершена)
         return RedirectResponse(url="/admin/archive", status_code=303)
 
     @expose("/dashboard/upcoming-repairs", methods=["GET"])
@@ -605,8 +563,7 @@ class DashboardView(BaseView):
         async with DBManager(session_factory=async_session_maker) as db:
             service = PlanningService(db)
 
-            trains_query = select(RollingStock)
-            trains = (await db.session.execute(trains_query)).scalars().all()
+            trains = await db.trains.get_all(limit=1000)
 
             for train in trains:
                 plan_info = await service.get_train_planning_status(train.id)
@@ -646,11 +603,9 @@ class CreateTaskAdminView(BaseView):
     @expose("/create-task", methods=["GET"])
     async def create_task_page(self, request: Request):
         async with DBManager(session_factory=async_session_maker) as db:
-            trains_query = select(RollingStock)
-            brigades_query = select(WorkBrigade)
 
-            trains = (await db.session.execute(trains_query)).scalars().all()
-            brigades = (await db.session.execute(brigades_query)).scalars().all()
+            trains = await db.trains.get_all(limit=1000)
+            brigades = await db.brigades.get_all(limit=1000)
 
             return await self.templates.TemplateResponse(
                 request,
@@ -694,26 +649,7 @@ class ArchiveView(BaseView):
         search = request.query_params.get("search", "").strip()
 
         async with DBManager(session_factory=async_session_maker) as db:
-            query = (
-                select(RepairTask)
-                .join(RollingStock, RepairTask.rolling_stock_id == RollingStock.id)
-                .where(RepairTask.status == TaskStatusEnum.COMPLETED)
-                .options(
-                    selectinload(RepairTask.rolling_stock),
-                    selectinload(RepairTask.brigade)
-                )
-            )
-
-            if search:
-                query = query.where(
-                    or_(
-                        RollingStock.series.ilike(f"%{search}%"),
-                        RollingStock.inventory_number.ilike(f"%{search}%")
-                    )
-                )
-
-            query = query.order_by(RepairTask.actual_end_date.desc())
-            completed_tasks = (await db.session.execute(query)).scalars().all()
+            completed_tasks = await db.tasks.get_archived_tasks(limit=1000, search=search)
 
             return await self.templates.TemplateResponse(
                 request,

@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, ForeignKey, Enum, String, Table, Column, Intege
 from typing import Optional
 import datetime
 
-# Промежуточная таблица для связи с бригадой
+
 stage_brigade_association = Table(
     "stage_brigade_association",
     Base.metadata,
@@ -25,12 +25,9 @@ class RepairStage(Base):
     status: Mapped[StageStatusEnum] = mapped_column(Enum(StageStatusEnum), default=StageStatusEnum.PENDING)
     start_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_time: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Таймер и паузы
     last_paused_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     total_paused_seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     pause_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-
     repair_task: Mapped["RepairTask"] = relationship(back_populates="stages")
     regulation: Mapped["Regulation"] = relationship(back_populates="stages")
 

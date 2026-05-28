@@ -1,7 +1,6 @@
 <script>
     document.addEventListener("DOMContentLoaded", function() {
 
-        // 1. УБИРАЕМ ACTIONS
         document.querySelectorAll('.dropdown-toggle').forEach(el => {
             if (el.textContent.includes('Actions')) {
                 const drop = el.closest('.dropdown');
@@ -21,21 +20,17 @@
             "Search": "Найти"
         };
 
-        // 2. ИСПРАВЛЯЕМ ИНПУТЫ (ПОИСК И КНОПКИ СОХРАНЕНИЯ)
         function translateInputs() {
             document.querySelectorAll('input').forEach(input => {
-                // Перевод поиска
                 if (input.name === 'search' && input.placeholder) {
                     input.placeholder = input.placeholder.replace('Search:', 'Поиск:').replace('Search', 'Поиск...');
                 }
-                // Перевод кнопок типа <input type="submit" value="Save">
                 if ((input.type === 'submit' || input.type === 'button') && exactBtnTranslations[input.value.trim()]) {
                     input.value = exactBtnTranslations[input.value.trim()];
                 }
             });
         }
 
-        // 3. ПЕРЕВОДЧИК ТЕКСТОВЫХ УЗЛОВ (Для кнопок <a>, <button> и заголовков)
         function translateTextNodes(node) {
             if (node.nodeType === Node.TEXT_NODE) {
                 let originalText = node.nodeValue;
@@ -60,11 +55,9 @@
             }
         }
 
-        // 4. ПЕРЕВОДЧИК ПАГИНАЦИИ (Обход внутренностей тега)
         function translatePagination() {
             document.querySelectorAll('p.text-muted, div.text-muted').forEach(el => {
                 if (el.innerHTML.includes('Showing') && el.innerHTML.includes('items')) {
-                    // Заменяем слова, не трогая HTML-теги <span> вокруг цифр
                     el.innerHTML = el.innerHTML
                         .replace('Showing', 'Показано')
                         .replace('to', 'по')
@@ -77,15 +70,11 @@
             });
         }
 
-        // 5. АВТОМАТИЧЕСКОЕ СКРЫТИЕ УВЕДОМЛЕНИЙ
         function autoHideAlerts() {
-            // Ищем все всплывающие уведомления на странице
             const alerts = document.querySelectorAll('.alert');
 
             alerts.forEach(alert => {
-                // Ждем 4 секунды (4000 мс)
                 setTimeout(() => {
-                    // Добавляем плавное затухание
                     alert.style.transition = 'opacity 0.5s ease, margin 0.5s ease, padding 0.5s ease, height 0.5s ease';
                     alert.style.opacity = '0';
                     alert.style.margin = '0';
@@ -93,32 +82,24 @@
                     alert.style.height = '0';
                     alert.style.overflow = 'hidden';
 
-                    // Полностью удаляем элемент из HTML через полсекунды (когда закончится анимация)
                     setTimeout(() => alert.remove(), 500);
                 }, 4000);
             });
         }
 
-        // 6. ОЧИСТКА URL ОТ ФАНТОМНЫХ ОШИБОК
         function cleanUrlParams() {
-            // Если в ссылке есть слово error
             if (window.location.search.includes('error=')) {
-                // Собираем чистую ссылку без параметров
                 const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                // Тихо подменяем ссылку в браузере, не перезагружая страницу
                 window.history.replaceState({}, document.title, cleanUrl);
             }
         }
 
-        // Запускаем все функции
         cleanUrlParams();
         autoHideAlerts();
         translateInputs();
         translateTextNodes(document.body);
         translatePagination();
 
-
-        // Запуск с микрозадержкой для подстраховки динамического рендера
         setTimeout(() => {
             translateInputs();
             translateTextNodes(document.body);

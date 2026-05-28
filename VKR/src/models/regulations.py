@@ -16,7 +16,6 @@ class Regulation(Base):
     stages: Mapped[list["RepairStage"]] = relationship(back_populates="regulation")
     templates: Mapped[list["RegulationStageTemplate"]] = relationship(back_populates="regulation", cascade="all, delete-orphan")
 
-    # Уникальность из двух столбцов Тип ремонта (repair_type) и Модель поезда (train_series)
     __table_args__ = (
         UniqueConstraint("repair_type", "train_series", name="uq_repair_type_train_series"),
     )

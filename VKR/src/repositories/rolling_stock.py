@@ -20,3 +20,9 @@ class RollingStockRepository(BaseRepository[RollingStock, RollingStockCreate, Ro
         query = select(self.model).where(self.model.series == series).limit(1)
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
+
+    async def get_unique_series(self) -> list[str]:
+        """Получить список уникальных серий МВПС"""
+        query = select(self.model.series).distinct()
+        result = await self.session.execute(query)
+        return list(result.scalars().all())

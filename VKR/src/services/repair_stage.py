@@ -67,8 +67,6 @@ class RepairStageService:
         if not task:
             raise HTTPException(404, "Родительское задание не найдено")
 
-
-        # Защита Архива от изменений
         if task.status == TaskStatusEnum.COMPLETED:
             log.warning(f"Попытка изменить статус этапа (ID {stage_id}) в завершенной задаче (ID {task.id})")
             raise HTTPException(
@@ -85,7 +83,6 @@ class RepairStageService:
                 await self.db.commit()
             return stage
 
-        # Зашита завершенного этапа от изменений
         if old_status == StageStatusEnum.COMPLETED:
             log.warning(f"Попытка отката статуса для завершенного этапа ID {stage_id}")
             raise HTTPException(
@@ -96,7 +93,6 @@ class RepairStageService:
         task_stages = sorted(task.stages, key=lambda s: s.id)
         current_index = next(i for i, s in enumerate(task_stages) if s.id == stage.id)
 
-        # Ожидание запчастей или пауза
         if new_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS]:
             if new_status == StageStatusEnum.PAUSED and not status_data.pause_reason:
                 raise HTTPException(
@@ -114,10 +110,8 @@ class RepairStageService:
             else:
                 task.status = TaskStatusEnum.PAUSED
 
-        # Запуск этапа В работу
         elif new_status == StageStatusEnum.IN_PROGRESS:
 
-            # Проверка очередности этапов
             if current_index > 0:
                 incomplete_prev_stages = [
                     s for s in task_stages[:current_index]
@@ -134,7 +128,6 @@ class RepairStageService:
 
             log.info(f"Этап ID {stage_id} ('{stage.name}') переведен в работу.")
 
-            # Вариант 1: Снятие с паузы
             if old_status in [StageStatusEnum.PAUSED, StageStatusEnum.WAITING_PARTS] and stage.last_paused_at:
                 pause_duration = datetime.now(timezone.utc) - stage.last_paused_at
                 seconds = int(pause_duration.total_seconds())
@@ -148,7 +141,6 @@ class RepairStageService:
                 stage.last_paused_at = None
                 task.status = TaskStatusEnum.IN_PROGRESS
 
-            # Вариант 2: Первый старт этапа
             if not stage.start_time:
                 stage.start_time = datetime.now(timezone.utc)
 
@@ -163,18 +155,11 @@ class RepairStageService:
             else:
                 task.status = TaskStatusEnum.IN_PROGRESS
 
-        # Завершение этапа
         elif new_status == StageStatusEnum.COMPLETED:
             log.info(f"Этап ID {stage_id} ('{stage.name}') завершен.")
             if not stage.start_time:
                 stage.start_time = datetime.now(timezone.utc)
             stage.end_time = datetime.now(timezone.utc)
-
-            # is_last_stage = (current_index == len(task_stages) - 1)
-            # if is_last_stage:
-            #     log.info(f"Все этапы выполнены. Ремонтное задание ID {task.id} переведено в статус COMPLETED.")
-            #     task.status = TaskStatusEnum.COMPLETED
-            #     task.actual_end_date = datetime.now(timezone.utc)
 
         stage.status = new_status
         await self.db.commit()

@@ -27,7 +27,6 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
-# Защита swagger
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 

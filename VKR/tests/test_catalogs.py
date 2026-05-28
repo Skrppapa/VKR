@@ -20,7 +20,7 @@ async def test_create_brigade_validation_error(ac):
     response = await ac.post("/api/v1/catalogs/brigades", json={
         "name": "Бригада №2",
         "master_name": "Петров П.П.",
-        "master_id_number": "12345AB"  # Ошибка здесь
+        "master_id_number": "12345AB"
     })
 
     assert response.status_code == 422

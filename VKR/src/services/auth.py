@@ -13,10 +13,8 @@ class AuthService:
 
         log.info(f"Попытка авторизации пользователя: {username}")
 
-        # Поиск пользователя
         user = await self.db.users.get_by_username(username)
 
-        # Проверка пароля
         if not user or not verify_password(password, user.hashed_password):
             log.warning(f"Отказ в доступе. Неверный логин или пароль для пользователя: {username}")
             raise HTTPException(
@@ -25,7 +23,6 @@ class AuthService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Выдача токена
         log.info(f"Пользователь '{username}' успешно авторизован.")
         access_token = create_access_token(data={"sub": user.username})
         return {"access_token": access_token, "token_type": "bearer"}

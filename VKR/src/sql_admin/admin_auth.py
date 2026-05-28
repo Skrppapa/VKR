@@ -14,11 +14,9 @@ class AdminAuth(AuthenticationBackend):
             query = select(User).where(User.username == username)
             user = (await session.execute(query)).scalar_one_or_none()
 
-            # Существует ли юзер и совпадает ли пароль
             if not user or not verify_password(password, user.hashed_password):
                 return False
 
-            # Только admin имеет доступ к SqlAdmin
             if user.role != "admin":
                 return False
 

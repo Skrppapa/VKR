@@ -12,7 +12,6 @@ def setup_logger():
         level="INFO"
     )
 
-    # Запись в файл
     os.makedirs("logs", exist_ok=True)
 
     logger.add(

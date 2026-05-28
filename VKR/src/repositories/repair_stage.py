@@ -19,7 +19,6 @@ class RepairStageRepository(BaseRepository[RepairStage, RepairStageCreate, Repai
             .where(self.model.id == stage_id)
             .options(
                 selectinload(self.model.brigades),
-                # Тянем связь с запчастями и сразу подгружаем саму деталь
                 selectinload(self.model.part_associations).selectinload(StagePart.part)
             )
         )

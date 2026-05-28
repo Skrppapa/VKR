@@ -10,13 +10,11 @@ class PlanningService:
     async def get_train_planning_status(self, train_id: int):
         """Вычисление статусов по всем видам ремонта для конкретного МВПС"""
 
-        # Получаем МВПС
         train = await self.db.trains.get_by_id(train_id)
 
         if not train:
             raise HTTPException(404, "МВПС не найден")
 
-        # Получаем все регламенты для этой серии
         regulations = await self.db.regulations.get_all_by_series(train.series)
 
         planning_results = []
@@ -29,12 +27,10 @@ class PlanningService:
             )
 
             if not last_repair_date:
-                # Если ремонта еще не было, считаем от даты выпуска МВПС
                 base_date = datetime.combine(train.manufacture_date, datetime.min.time()).replace(tzinfo=timezone.utc)
             else:
                 base_date = last_repair_date
 
-            # Вычисляем оставшиеся дни
             next_repair_date = base_date + timedelta(days=reg.frequency_days)
             days_remaining = (next_repair_date - now).days
 

@@ -9,7 +9,6 @@ class RollingStockService:
         self.db = db
 
     async def create_train(self, train_in: RollingStockCreate) -> RollingStock:
-        # Проверка на дубликаты
         existing_train = await self.db.trains.get_by_inventory_number(train_in.inventory_number)
         if existing_train:
             raise HTTPException(
